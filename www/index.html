@@ -124,7 +124,7 @@ tr.hand:active td{background:var(--card2)}
 .closebtn{padding:8px 10px;font-size:calc(13px * var(--fs, 1));background:transparent;border:1px solid var(--line);white-space:nowrap}
 .closebtn.on{background:var(--gold);color:var(--on-gold);border-color:var(--gold);font-weight:700}
 .kinds{display:flex;gap:6px;margin-top:8px}
-.kinds button{flex:1;min-width:0;overflow-wrap:anywhere;padding:8px 6px;font-size:calc(13px * var(--fs, 1));background:var(--bg);border:1px solid var(--line)}
+.kinds button{flex:1;min-width:0;overflow-wrap:anywhere;padding-left:4px;padding-right:4px;padding:8px 6px;font-size:calc(13px * var(--fs, 1));background:var(--bg);border:1px solid var(--line)}
 .kinds button.on{background:var(--gold);color:var(--on-gold);font-weight:700;border-color:var(--gold)}
 .sheet .acts{display:flex;gap:10px;margin-top:14px}
 .sheet .acts button{flex:1;padding:14px}
@@ -151,6 +151,27 @@ tr.hand:active td{background:var(--card2)}
 #menuBtn.dot::after{content:'';position:absolute;top:6px;right:6px;width:11px;height:11px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--felt)}
 #updBanner{display:none;background:var(--gold);color:var(--on-gold);font-weight:700;text-align:center;padding:10px 14px;cursor:pointer;font-size:calc(15px * var(--fs, 1))}
 #updBanner.on{display:block}
+.pf-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pf-av{width:48px;height:48px;border-radius:50%;background:var(--gold);color:var(--on-gold);display:grid;place-items:center;font-weight:800;flex:none}
+.pf-rating{font-size:calc(30px * var(--fs, 1));font-weight:800;color:var(--gold);line-height:1}
+.pf-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.pf-kpi{background:var(--card);border-radius:12px;padding:10px 12px}
+.pf-kpi span{display:block;font-size:calc(12px * var(--fs, 1));color:var(--mut)}
+.pf-kpi b{font-size:calc(22px * var(--fs, 1))}
+.pf-kpi small,.pf-line small,.pf-t small{font-weight:400;color:var(--mut);font-size:calc(13px * var(--fs, 1))}
+.pf-t{font-weight:700;color:var(--gold);margin:6px 0 6px;font-size:calc(14px * var(--fs, 1))}
+.pf-box{background:var(--card);border-radius:12px;padding:6px 12px;margin-bottom:10px}
+.pf-line{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+.pf-line:first-child{border-top:0}
+.pf-h2h{display:flex;align-items:center;gap:10px;padding:6px 0}
+.pf-h2h span{width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-h2h b{width:52px;text-align:right}
+.pf-bar{flex:1;height:10px;border-radius:5px;background:var(--red);overflow:hidden;opacity:.9}
+.pf-bar i{display:block;height:100%;background:var(--ok)}
+.pf-months{display:flex;align-items:flex-end;gap:8px;height:110px;padding-top:6px}
+.pf-months div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%}
+.pf-months i{display:block;width:100%;background:var(--card2);border-radius:5px 5px 0 0}
+.pf-months small,.pf-months span{font-size:calc(11px * var(--fs, 1));color:var(--mut)}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
@@ -214,7 +235,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.5.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -468,12 +489,14 @@ function openRoster() {
     ${list.map((n, i) => `<div class="hrow"><div class="top">
       <input type="text" maxlength="18" value="${esc(n)}" data-ro="${i}" data-orig="${esc(n)}" style="flex:1;min-width:0">
       <span class="mut" style="white-space:nowrap">${games[nkey(n)] || 0} part.</span>
+      ${games[nkey(n)] ? `<button class="closebtn" data-pstat="${esc(n)}" aria-label="Ver ficha">📊</button>` : ''}
       <button class="closebtn" data-rodel="${esc(n)}" aria-label="Quitar">✕</button></div></div>`).join('') || '<div class="empty">Aún no hay jugadores guardados.</div>'}
     <div class="hrow"><div class="top"><input type="text" maxlength="18" id="roNew" placeholder="Nuevo jugador" style="flex:1;min-width:0"><button class="closebtn" id="roAdd">＋ Añadir</button></div></div>
     <div class="mut">Quitar a alguien de la lista no borra sus partidas del historial.</div>
     <div class="acts"><button class="btn-ghost" id="roC">Cancelar</button><button class="btn-gold" id="roS">Guardar</button></div>`);
   const pending = { removed: new Set() };
   $('#roC').onclick = () => { closeModal(); render(); };
+  document.querySelectorAll('[data-pstat]').forEach(b => b.onclick = () => openPlayer(b.dataset.pstat, openRoster));
   document.querySelectorAll('[data-rodel]').forEach(b => b.onclick = () => { pending.removed.add(nkey(b.dataset.rodel)); b.closest('.hrow').style.display = 'none'; });
   const readEdits = () => [...document.querySelectorAll('[data-ro]')].map(el => ({ o: el.dataset.orig, v: el.value.trim() }));
   const applyRoster = (edits) => {
@@ -753,13 +776,137 @@ function aggregate(results) {
 const fmt1 = v => (Math.round(v * 10) / 10).toLocaleString('es-ES');
 const medal = i => ['🥇', '🥈', '🥉'][i] || (i + 1) + '.';
 
+/* ---------- Ficha de jugador ---------- */
+function playerStats(key) {
+  const all = S.archive.map(a => ({ a, r: gameResult(a) })).filter(x => x.r);
+  const games = [];
+  all.forEach(({ a, r }) => {
+    const me = r.rows.find(x => x.key === key); if (!me) return;
+    const pl = a.players.find(p => nkey(p.name) === key); const R = compute(a);
+    let hp = 0, hn = 0, bonus = 0;
+    R.rows.forEach(row => {
+      if (row.type !== 'hand') return;
+      if (pl.id in row.applied) { hn++; hp += Math.max(0, row.applied[pl.id]); }
+      if (row.e.closer === pl.id && row.e.kind === 'bonus') bonus++;
+    });
+    games.push({ ts: r.ts, pos: me.pos, win: me.win, rebuys: me.rebuys, closes: me.closes, chin: me.chin, bonus, hp, hn, rivals: r.rows.filter(x => x.key !== key) });
+  });
+  if (!games.length) return null;
+  games.sort((x, y) => x.ts - y.ts);
+  let best = 0, cur = 0; games.forEach(g => { cur = g.win ? cur + 1 : 0; best = Math.max(best, cur); });
+  const rank = aggregate(all.map(x => x.r)).sort((a, b) => (b.rating - a.rating) || (b.g - a.g) || (b.pj - a.pj));
+  const ri = rank.findIndex(o => nkey(o.name) === key);
+  const h2h = {};
+  games.forEach(g => g.rivals.forEach(o => { const h = h2h[o.key] || (h2h[o.key] = { name: o.name, ahead: 0, behind: 0 }); h.name = o.name; if (g.pos < o.pos) h.ahead++; else h.behind++; }));
+  const monthKey = ts => { const d = new Date(ts - JORNADA_HOUR * 3600e3); return d.getFullYear() + '-' + pad2(d.getMonth() + 1); };
+  const byMonth = {}; all.forEach(x => (byMonth[monthKey(x.r.ts)] = byMonth[monthKey(x.r.ts)] || []).push(x.r));
+  const months = [...new Set(games.map(g => monthKey(g.ts)))].sort().slice(-6).map(m => {
+    const o = aggregate(byMonth[m]).find(z => nkey(z.name) === key);
+    const [y, mm] = m.split('-').map(Number);
+    return { label: new Date(y, mm - 1, 1).toLocaleDateString('es-ES', { month: 'short' }).replace('.', ''), v: o ? o.rating * 10 : 0 };
+  });
+  const sum = f => games.reduce((a, g) => a + f(g), 0);
+  return {
+    name: rank[ri] ? rank[ri].name : key, rankPos: ri + 1, rating: rank[ri] ? rank[ri].rating * 10 : 0,
+    pj: games.length, g: sum(g => g.win ? 1 : 0), avgPos: sum(g => g.pos) / games.length,
+    perHand: sum(g => g.hn) ? sum(g => g.hp) / sum(g => g.hn) : 0, best, cur,
+    closes: sum(g => g.closes), bonus: sum(g => g.bonus), chin: sum(g => g.chin), rebuys: sum(g => g.rebuys),
+    winAfterRebuy: sum(g => g.win && g.rebuys ? 1 : 0), since: games[0].ts,
+    h2h: Object.values(h2h).sort((a, b) => (b.ahead + b.behind) - (a.ahead + a.behind)).slice(0, 8), months
+  };
+}
+function openPlayer(name, back) {
+  const st = playerStats(nkey(name));
+  if (!st) { toast('Aún no hay partidas terminadas de ' + name); return; }
+  const ini = st.name.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || st.name.slice(0, 2).toUpperCase();
+  const since = new Date(st.since).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }).replace('.', '');
+  const kpi = (l, v, sub) => `<div class="pf-kpi"><span>${l}</span><b>${v}${sub ? ` <small>${sub}</small>` : ''}</b></div>`;
+  const line = (ic, l, v) => `<div class="pf-line"><span>${ic} ${l}</span><b>${v}</b></div>`;
+  const maxM = Math.max(10, ...st.months.map(m => m.v));
+  openModal(`
+    <div class="pf-head"><div class="pf-av">${esc(ini)}</div>
+      <div style="flex:1;min-width:0"><h3 style="margin:0">${esc(st.name)}</h3><div class="mut">${st.rankPos}º en el ranking · desde ${esc(since)}</div></div>
+      <div style="text-align:right"><div class="pf-rating">${Math.round(st.rating)}</div><div class="mut" style="font-size:calc(11px * var(--fs, 1))">valoración</div></div></div>
+    <div class="pf-kpis">
+      ${kpi('Partidas', st.pj)}${kpi('Victorias', st.g, Math.round(st.g / st.pj * 100) + '%')}
+      ${kpi('Puesto medio', fmt1(st.avgPos) + 'º')}${kpi('Media por mano', fmt1(st.perHand), 'pts')}
+    </div>
+    <div class="pf-t">Rachas y jugadas</div>
+    <div class="pf-box">
+      ${line('🔥', 'Mejor racha', st.best + (st.best === 1 ? ' victoria' : ' victorias seguidas'))}
+      ${line('📈', 'Racha actual', st.cur ? st.cur + (st.cur === 1 ? ' victoria' : ' victorias') : '—')}
+      ${line('✓', 'Manos cerradas', st.closes + (st.bonus ? ` <small>· ${st.bonus} con ${S.game ? S.game.cfg.closeBonus : -10}</small>` : ''))}
+      ${line('★', 'Chinchones', st.chin)}
+      ${line('↻', 'Reenganches', st.rebuys + (st.winAfterRebuy ? ` <small>· ganó ${st.winAfterRebuy} tras reengancharse</small>` : ''))}
+    </div>
+    ${st.h2h.length ? `<div class="pf-t">Cara a cara <small>(por delante – por detrás)</small></div><div class="pf-box">` + st.h2h.map(h => `
+      <div class="pf-h2h"><span>${esc(h.name)}</span><div class="pf-bar"><i style="width:${Math.round(h.ahead / (h.ahead + h.behind) * 100)}%"></i></div><b>${h.ahead}–${h.behind}</b></div>`).join('') + '</div>' : ''}
+    ${st.months.length > 1 ? `<div class="pf-t">Valoración por mes</div><div class="pf-box"><div class="pf-months">` + st.months.map((m, i) => `
+      <div><small>${Math.round(m.v)}</small><i style="height:${Math.max(4, Math.round(m.v / maxM * 70))}px;${i === st.months.length - 1 ? 'background:var(--gold)' : ''}"></i><span>${esc(m.label)}</span></div>`).join('') + '</div></div>' : ''}
+    <button class="btn-ghost" id="pfShare" style="width:100%;margin-top:12px">📤 Compartir ficha como imagen</button>
+    <div class="acts"><button class="btn-gold" id="pfBack">${back ? '‹ Volver' : 'Cerrar'}</button></div>`);
+  $('#pfBack').onclick = () => back ? back() : closeModal();
+  $('#pfShare').onclick = () => shareImage(drawShareImage({
+    title: 'Ficha de ' + st.name, subtitle: st.rankPos + 'º en el ranking · valoración ' + Math.round(st.rating),
+    cols: ['', 'Estadística', 'Valor'],
+    rows: [['🃏', 'Partidas', st.pj], ['🏆', 'Victorias', st.g + ' (' + Math.round(st.g / st.pj * 100) + '%)'], ['📊', 'Puesto medio', fmt1(st.avgPos) + 'º'], ['🎯', 'Media por mano', fmt1(st.perHand) + ' pts'],
+      ['🔥', 'Mejor racha', st.best], ['✓', 'Manos cerradas', st.closes], ['★', 'Chinchones', st.chin], ['↻', 'Reenganches', st.rebuys]],
+    note: st.h2h.length ? 'Cara a cara: ' + st.h2h.slice(0, 3).map(h => h.name + ' ' + h.ahead + '–' + h.behind).join(' · ') : ''
+  }), 'chinchon-' + nkey(st.name).replace(/[^a-z0-9]+/g, '-') + '.png', 'Mis estadísticas de chinchón 🃏');
+}
+
+/* ---------- Récords ---------- */
+function computeRecords() {
+  const games = S.archive.map(a => ({ a, r: gameResult(a), R: compute(a) })).filter(x => x.r).sort((x, y) => x.r.ts - y.r.ts);
+  if (!games.length) return [];
+  const fd = ts => new Date(ts).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '');
+  const recs = [];
+  const top = (obj) => { let best = null; for (const k in obj) if (!best || obj[k].v > best.v) best = obj[k]; return best; };
+  // rachas de victorias
+  const streak = {}, cur = {};
+  games.forEach(({ r }) => r.rows.forEach(x => { cur[x.key] = x.win ? (cur[x.key] || 0) + 1 : 0; if (!streak[x.key] || cur[x.key] > streak[x.key].v) streak[x.key] = { who: x.name, v: cur[x.key] }; }));
+  const st = top(streak); if (st && st.v > 1) recs.push({ ic: '🔥', t: 'Mejor racha de victorias', who: st.who, val: st.v + ' seguidas' });
+  // partida más larga y más corta
+  const byHands = games.slice().sort((x, y) => y.r.hands - x.r.hands);
+  const L = byHands[0], C = byHands[byHands.length - 1];
+  recs.push({ ic: '⏳', t: 'Partida más larga', who: 'Ganó ' + L.r.rows[0].name, val: L.r.hands + ' manos', sub: fd(L.r.ts) });
+  if (games.length > 1) recs.push({ ic: '⚡', t: 'Partida más corta', who: 'Ganó ' + C.r.rows[0].name, val: C.r.hands + ' manos', sub: fd(C.r.ts) });
+  // totales por jugador
+  const tot = (f) => { const m = {}; games.forEach(({ r }) => r.rows.forEach(x => { const v = f(x); if (!v) return; const o = m[x.key] || (m[x.key] = { who: x.name, v: 0 }); o.v += v; o.who = x.name; })); return top(m); };
+  const ch = tot(x => x.chin); if (ch) recs.push({ ic: '★', t: 'Más chinchones', who: ch.who, val: ch.v });
+  const pj = tot(() => 1); if (pj) recs.push({ ic: '🃏', t: 'Más partidas jugadas', who: pj.who, val: pj.v });
+  const war = tot(x => x.win && x.rebuys ? 1 : 0); if (war) recs.push({ ic: '🦅', t: 'Más victorias tras reengancharse', who: war.who, val: war.v });
+  // por partida / por mano
+  let reb = null, hand = null, bonus = {};
+  games.forEach(({ a, r, R }) => {
+    r.rows.forEach(x => { if (x.rebuys && (!reb || x.rebuys > reb.v)) reb = { who: x.name, v: x.rebuys, ts: r.ts }; });
+    R.rows.forEach(row => { if (row.type !== 'hand') return;
+      for (const id in row.applied) { const v = row.applied[id]; if (!hand || v > hand.v) hand = { who: pname(a, id), v, ts: r.ts }; }
+      if (row.e.kind === 'bonus' && row.e.closer) { const k = nkey(pname(a, row.e.closer)); const o = bonus[k] || (bonus[k] = { who: pname(a, row.e.closer), v: 0 }); o.v++; } });
+  });
+  const bo = top(bonus); if (bo) recs.push({ ic: '✓', t: 'Más cierres con todo ligado', who: bo.who, val: bo.v });
+  if (reb && reb.v > 1) recs.push({ ic: '↻', t: 'Más reenganches en una partida', who: reb.who, val: reb.v, sub: fd(reb.ts) });
+  if (hand && hand.v > 0) recs.push({ ic: '💥', t: 'Mano más cara', who: hand.who, val: hand.v + ' pts', sub: fd(hand.ts) });
+  // jornadas
+  const byDay = {}; games.forEach(({ r }) => (byDay[jornadaKey(r.ts)] = byDay[jornadaKey(r.ts)] || []).push(r));
+  let bigDay = null, dayWins = null;
+  for (const k in byDay) {
+    const list = byDay[k]; if (!bigDay || list.length > bigDay.v) bigDay = { v: list.length, k };
+    const w = {}; list.forEach(r => { const x = r.rows[0]; const o = w[x.key] || (w[x.key] = { who: x.name, v: 0 }); o.v++; });
+    const t = top(w); if (t && (!dayWins || t.v > dayWins.v)) dayWins = { ...t, k };
+  }
+  if (dayWins && dayWins.v > 1) recs.push({ ic: '👑', t: 'Más victorias en una jornada', who: dayWins.who, val: dayWins.v, sub: jornadaLabel(dayWins.k).replace(/^[^,]+, /, '') });
+  if (bigDay && bigDay.v > 1) recs.push({ ic: '📅', t: 'Jornada con más partidas', who: jornadaLabel(bigDay.k).replace(/^[^,]+, /, ''), val: bigDay.v + ' partidas' });
+  return recs;
+}
+
 let AV = { tab: 'ranking', period: 'all', open: null };
 function openArchive(tab) {
   if (typeof tab === 'string') AV.tab = tab;
   const done = S.archive.map(a => ({ a, r: gameResult(a) })).filter(x => x.r);
   const now = new Date();
   const inPeriod = ts => { const d = new Date(ts - JORNADA_HOUR * 3600e3); return AV.period === 'all' || (AV.period === 'year' && d.getFullYear() === now.getFullYear()) || (AV.period === 'month' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()); };
-  const tabs = `<div class="kinds" style="margin:0 0 12px">${[['ranking', '🏆 Ranking'], ['jornadas', '📅 Jornadas'], ['partidas', '📜 Partidas']].map(([k, l]) => `<button data-tab="${k}" class="${AV.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="kinds" style="margin:0 0 12px">${[['ranking', '🏆 Ranking'], ['jornadas', '📅 Jornadas'], ['records', '🏅 Récords'], ['partidas', '📜 Partidas']].map(([k, l]) => `<button data-tab="${k}" class="${AV.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   let body = '';
   const SH = {};
   if (!S.archive.length) {
@@ -772,8 +919,9 @@ function openArchive(tab) {
       note: 'Valoración 0–100: media por partida ajustada por partidas jugadas.' } };
     body = `<div class="kinds" style="margin:0 0 10px">${[['all', 'Siempre'], ['year', 'Este año'], ['month', 'Este mes']].map(([k, l]) => `<button data-period="${k}" class="${AV.period === k ? 'on' : ''}">${l}</button>`).join('')}</div>` +
       (list.length ? `<div class="tbl-wrap"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th>Valor.</th><th>PJ</th><th>G</th><th>% G</th><th>Pos. media</th><th>Pts</th><th>★</th><th>↻</th></tr></thead><tbody>` +
-        list.map((o, i) => `<tr><td>${medal(i)}</td><td style="text-align:left;font-weight:700">${esc(o.name)}</td><td><b style="color:var(--gold);font-size:calc(16px * var(--fs, 1))">${Math.round(o.rating * 10)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${Math.round(o.g / o.pj * 100)}%</td><td>${fmt1(o.avgPos)}º</td><td>${fmt1(o.pts)}</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
+        list.map((o, i) => `<tr data-player="${esc(o.name)}" style="cursor:pointer"><td>${medal(i)}</td><td style="text-align:left;font-weight:700;text-decoration:underline;text-decoration-color:var(--line)">${esc(o.name)}</td><td><b style="color:var(--gold);font-size:calc(16px * var(--fs, 1))">${Math.round(o.rating * 10)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${Math.round(o.g / o.pj * 100)}%</td><td>${fmt1(o.avgPos)}º</td><td>${fmt1(o.pts)}</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
         `</tbody></table></div>
+        <div class="mut" style="margin-top:6px">Toca un jugador para ver su ficha.</div>
         <button class="btn-ghost" data-share="rank" style="width:100%;margin-top:10px">📤 Compartir ranking como imagen</button>
         <details class="sec" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">¿Cómo se calcula?</summary>
           <div class="mut" style="margin-top:8px;line-height:1.5">
@@ -796,10 +944,19 @@ function openArchive(tab) {
       return `<div class="hrow" style="padding:0;overflow:hidden">
         <div class="top" data-day="${k}" style="padding:12px;cursor:pointer"><div class="n">${esc(jornadaLabel(k))}<small>${res.length} partida${res.length === 1 ? '' : 's'} · 🏆 ${esc(list[0].name)} (${fmt1(list[0].pts)} pts)</small></div><span>${isOpen ? '▾' : '▸'}</span></div>
         ${isOpen ? `<div class="tbl-wrap" style="border-radius:0"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th>Pts</th><th>PJ</th><th>G</th><th>Pos. media</th><th>★</th><th>↻</th></tr></thead><tbody>` +
-          list.map((o, i) => `<tr><td>${medal(i)}</td><td style="text-align:left;font-weight:700">${esc(o.name)}</td><td><b style="color:var(--gold)">${fmt1(o.pts)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${fmt1(o.avgPos)}º</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
+          list.map((o, i) => `<tr data-player="${esc(o.name)}" style="cursor:pointer"><td>${medal(i)}</td><td style="text-align:left;font-weight:700;text-decoration:underline;text-decoration-color:var(--line)">${esc(o.name)}</td><td><b style="color:var(--gold)">${fmt1(o.pts)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${fmt1(o.avgPos)}º</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
           `</tbody></table></div><div style="padding:10px"><button class="btn-ghost" data-share="j${k}" style="width:100%">📤 Compartir jornada como imagen</button></div>` : ''}
       </div>`;
     }).join('') + '<div class="mut">Puntos por partida: 10 al ganador, 0 al último y el resto según su puesto. La jornada va de 6:00 a 6:00.</div>'
+      : '<div class="empty">Aún no hay partidas terminadas.</div>';
+  } else if (AV.tab === 'records') {
+    const recs = computeRecords();
+    SH.records = { file: 'chinchon-records.png', text: 'Récords de chinchón 🏅', img: { title: 'Récords', subtitle: done.length + ' partidas jugadas',
+      cols: ['', 'Récord', 'Valor'], rows: recs.slice(0, 12).map(r => [r.ic, r.t + ': ' + r.who, r.val]), note: '' } };
+    body = recs.length ? recs.map(r => `<div class="hrow"><div class="top"><div style="font-size:calc(24px * var(--fs, 1));width:34px;text-align:center">${r.ic}</div>
+        <div class="n">${esc(r.t)}<small>${esc(r.who)}${r.sub ? ' · ' + esc(r.sub) : ''}</small></div>
+        <b style="color:var(--gold);white-space:nowrap">${esc(String(r.val))}</b></div></div>`).join('') +
+      '<button class="btn-ghost" data-share="records" style="width:100%;margin-top:6px">📤 Compartir récords como imagen</button>'
       : '<div class="empty">Aún no hay partidas terminadas.</div>';
   } else {
     body = archiveHtml(S.archive.length) + `<div class="mut" style="margin:6px 0">Caben hasta ${MAX_ARCHIVE} partidas; al superarlas se borra la más antigua.</div>`;
@@ -814,6 +971,7 @@ function openArchive(tab) {
   document.querySelectorAll('#modal [data-tab]').forEach(b => b.onclick = () => openArchive(b.dataset.tab));
   document.querySelectorAll('#modal [data-period]').forEach(b => b.onclick = () => { AV.period = b.dataset.period; openArchive(); });
   document.querySelectorAll('#modal [data-day]').forEach(b => b.onclick = () => { AV.open = AV.open === b.dataset.day ? '' : b.dataset.day; openArchive(); });
+  document.querySelectorAll('#modal [data-player]').forEach(tr => tr.onclick = () => openPlayer(tr.dataset.player, () => openArchive()));
   document.querySelectorAll('#modal [data-share]').forEach(b => b.onclick = () => { const d = SH[b.dataset.share]; if (d) shareImage(drawShareImage(d.img), d.file, d.text); });
   document.querySelectorAll('#modal [data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
 }
