@@ -173,6 +173,39 @@ tr.hand:active td{background:var(--card2)}
 .pf-months div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%}
 .pf-months i{display:block;width:100%;background:var(--card2);border-radius:5px 5px 0 0}
 .pf-months small,.pf-months span{font-size:calc(11px * var(--fs, 1));color:var(--mut)}
+.pt-opps{display:flex;gap:8px;margin-bottom:12px}
+.pt-opp{flex:1;min-width:0;background:var(--card);border-radius:12px;padding:8px 10px;border:2px solid transparent}
+.pt-opp.turn{border-color:var(--gold)}
+.pt-on{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-ot{font-size:calc(13px * var(--fs, 1));color:var(--mut)}
+.pt-ob{display:flex;margin-top:4px;height:18px}
+.pt-ob i{width:12px;height:18px;border-radius:3px;background:var(--card2);border:1px solid var(--line);margin-right:-4px}
+.pt-mid{display:flex;justify-content:center;gap:28px;margin:6px 0 8px}
+.pt-pile{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mut);font-size:calc(12px * var(--fs, 1))}
+.pt-btn{padding:0;background:none;border-radius:10px}
+.pt-btn[disabled]{opacity:1}
+.pt-btn:not([disabled]) .pc-card{box-shadow:0 0 0 3px var(--gold)}
+.pt-pile .pc-card{width:64px;font-size:22px}
+.pt-log{text-align:center;color:var(--mut);font-size:calc(14px * var(--fs, 1));min-height:1.3em}
+.pt-hint{text-align:center;font-size:calc(15px * var(--fs, 1));margin:6px 0 10px;min-height:1.3em}
+.pt-hand{display:flex;justify-content:center;gap:4px;flex-wrap:nowrap}
+.pt-hand:not(.mini) .pc-card{flex:1 1 0;min-width:0;width:auto;max-width:58px}
+.pt-hand:not(.mini) .pc-s{width:70%}
+.pt-hand.mini{justify-content:flex-start;margin-top:6px}
+.pt-info{text-align:center;color:var(--mut);font-size:calc(13px * var(--fs, 1));margin:10px 0}
+.pt-acts{display:flex;gap:8px}
+.pt-acts button{flex:1;padding:14px 6px}
+.pc-card{position:relative;width:min(13vw, 58px);aspect-ratio:5/8;padding:0;border-radius:8px;background:#fbf7ec;border:2px solid #d8d0bc;color:#1d1d1d;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3px 0 6px;transition:transform .12s;flex:none;font-size:calc(17px * var(--fs, 1))}
+.pc-card.small{width:min(9vw, 38px);font-size:13px;border-width:1px;padding:2px 0 4px}
+.pc-card.sel{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.pc-card.back{background:repeating-linear-gradient(45deg,#8e2b22 0 6px,#a8362c 6px 12px);border-color:#f3efe2;justify-content:center}
+.pc-card.back span{background:#f3efe2;color:#8e2b22;border-radius:6px;padding:1px 5px;font-weight:800;font-size:13px}
+.pc-card.empty{background:transparent;border:2px dashed var(--line)}
+.pc-r{font-weight:800;line-height:1}
+.pc-o{color:#a87400}.pc-c{color:#b03024}.pc-e{color:#22508f}.pc-b{color:#2e7d32}
+.pc-s{width:62%;display:block}.pc-s svg{width:100%;height:auto;display:block}
+.pc-new{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--on-gold);font-style:normal;font-size:10px;font-weight:800;border-radius:6px;padding:0 4px;line-height:1.5}
+.pc-m{position:absolute;left:6px;right:6px;bottom:2px;height:4px;border-radius:2px;background:var(--mc)}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
@@ -187,6 +220,7 @@ tr.hand:active td{background:var(--card2)}
 <div id="toast"></div>
 <div id="undoBar"></div>
 
+<script src="juego.js"></script>
 <script>
 'use strict';
 /* ================= Estado y persistencia ================= */
@@ -236,7 +270,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.1.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -272,7 +306,7 @@ S.archive = S.archive || [];
 if (!Array.isArray(S.roster)) {
   S.roster = [];
   const seen = new Set();
-  const addSeed = n => { n = String(n || '').trim(); const k = n.toLowerCase(); if (n && !/^jugador \d+$/i.test(n) && !seen.has(k)) { seen.add(k); S.roster.push(n); } };
+  const addSeed = n => { n = String(n || '').trim(); const k = n.toLowerCase(); if (n && !/^jugador \d+$/i.test(n) && !/^🤖/.test(n) && !seen.has(k)) { seen.add(k); S.roster.push(n); } };
   (S.lastNames || []).forEach(addSeed);
   S.archive.forEach(a => (a.players || []).forEach(p => addSeed(p.name)));
   if (S.game) S.game.players.forEach(p => addSeed(p.name));
@@ -402,6 +436,7 @@ function readCfg(prefix) {
 }
 
 function renderSetup() {
+  if (S.draft.mode === 'play') return renderPlaySetup();
   $('#subtitle').textContent = 'Nueva partida';
   const d = S.draft;
   const rows = d.names.map((n, i) => `
@@ -412,6 +447,7 @@ function renderSetup() {
       <button data-del="${i}" ${d.names.length <= 2 ? 'disabled' : ''} aria-label="Quitar">✕</button>
     </div>`).join('');
   $('#app').innerHTML = `
+    ${modeToggleHtml()}
     <div class="sec plist">
       <h2>Jugadores</h2>
       ${S.roster.length ? `<div class="mut" style="margin-bottom:6px">Toca los habituales para añadirlos o quitarlos:</div>
@@ -427,6 +463,7 @@ function renderSetup() {
     <div class="copy">© 2026 IT Canarias</div>
     <button class="btn-gold fab" id="start">Empezar partida</button>`;
   bindCfg('s_');
+  bindModeToggle();
   const syncNames = () => document.querySelectorAll('[data-name]').forEach(el => d.names[+el.dataset.name] = el.value);
   const syncCfg = () => { d.cfg = readCfg('s_'); };
   document.querySelectorAll('[data-name]').forEach(el => el.oninput = () => { d.names[+el.dataset.name] = el.value; save(); });
@@ -793,7 +830,7 @@ function mergeBackup(b) {
   S.archive = S.archive.concat(nuevas).sort((x, y) => (y.finished || y.created || 0) - (x.finished || x.created || 0)).slice(0, MAX_ARCHIVE);
   const g = !S.game && cleanGame(b.game, false); if (g) S.game = g;
   (Array.isArray(b.roster) ? b.roster : []).map(cleanName).forEach(n => { if (n && !S.roster.some(x => nkey(x) === nkey(n))) S.roster.push(n); });
-  S.archive.forEach(a => a.players.forEach(p => { if (!/^Jugador \d+$/.test(p.name) && !S.roster.some(x => nkey(x) === nkey(p.name))) S.roster.push(p.name); }));
+  S.archive.forEach(a => a.players.forEach(p => { if (!/^Jugador \d+$/.test(p.name) && !/^🤖/.test(p.name) && !S.roster.some(x => nkey(x) === nkey(p.name))) S.roster.push(p.name); }));
   if (!S.theme && THEMES[b.theme]) { S.theme = b.theme; applyTheme(S.theme); }
   if (!S.fontScale && FONT_SIZES.some(f => f[0] === String(b.fontScale))) { S.fontScale = String(b.fontScale); applyFont(); }
   return nuevas.length;
@@ -1128,6 +1165,8 @@ function openArchive(tab) {
 /* ---------- Partida en curso ---------- */
 function renderGame() {
   const g = S.game, R = compute(g), c = g.cfg;
+  if (g.play && !R.ended) return renderTable(g, R);
+  clearTimeout(playTimer);
   $('#subtitle').textContent = R.ended ? 'Partida terminada' : `Mano ${R.hand + 1} · límite ${c.limit}`;
   let html = '';
   if (R.ended) {
@@ -1222,6 +1261,7 @@ function finishAndNew(rematch) {
     const order = g.players.map(p => p.id), i = order.indexOf(g.firstDealer);
     const players = g.players.map(p => ({ id: uid(), name: p.name }));
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, g.cfg), players, firstDealer: players[(i + 1) % players.length].id, events: [] };
+    if (g.play) S.game.play = { level: g.play.level, bots: g.players.map((p, k) => g.play.bots.includes(p.id) ? players[k].id : null).filter(Boolean), hand: null };
   } else {
     S.draft.names = g.players.map(p => p.name); S.draft.cfg = Object.assign({}, g.cfg); S.draft.dealer = 0;
     S.game = null;
@@ -1382,7 +1422,7 @@ $('#menuBtn').onclick = () => {
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   } else {
     openModal(`<h3>Menú</h3><div class="menu">
-      <button id="mUndo" ${g.events.length ? '' : 'disabled'}>↶ Deshacer último movimiento</button>
+      ${g.play ? '' : `<button id="mUndo" ${g.events.length ? '' : 'disabled'}>↶ Deshacer último movimiento</button>`}
       <button id="mRules">⚙️ Reglas de esta partida</button>
       <button id="mPlayers">✏️ Cambiar nombres</button>
       <button id="mShare">📋 Copiar resumen</button>

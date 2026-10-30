@@ -174,6 +174,72 @@ console.log('Bienvenida, actualizaciones y tamaño de letra');
   await ctx.close();
 }
 
+console.log('Juego contra la máquina');
+{
+  const { p, ctx, errors } = await fresh();
+  const m = await p.evaluate(() => ({
+    set: bestMelds(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'o12']).dead,             // trío de 5 + escalera 2-3-4 de bastos, suelta el rey
+    run710: bestMelds(['c6', 'c7', 'c10', 'c11', 'o1', 'e1', 'b1']).dead,         // 6-7-sota-caballo de copas (7 y sota seguidas) + trío de ases
+    overlap: bestMelds(['o3', 'o4', 'o5', 'c5', 'e5', 'b6', 'o6']).dead,           // escalera 3-6 de oros (deja 5+5+6) mejor que trío de cincos
+    loose: bestMelds(['o1', 'c3', 'e5', 'b7', 'o10', 'c11', 'e12']).dead,
+    chin: isChinchon(['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7']), chinNo: isChinchon(['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'o7']),
+    disc: bestDiscard(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'o12', 'c1']).discard
+  }));
+  check('trío + escalera, suelto el rey (10)', m.set === 10, JSON.stringify(m));
+  check('el 7 y la sota van seguidos en escalera', m.run710 === 0);
+  check('elige la mejor combinación cuando una carta vale para dos', m.overlap === 16, String(m.overlap));
+  check('mano sin nada ligado suma todo', m.loose === 1 + 3 + 5 + 7 + 10 + 10 + 10);
+  check('detecta el chinchón', m.chin && !m.chinNo);
+  check('la máquina tira la carta que más pesa sin ligar', m.disc === 'o12', m.disc);
+  // 150 partidas completas entre máquinas
+  const sim = await p.evaluate(() => {
+    let games = 0, hands = 0, bad = 0, ended = 0;
+    for (let k = 0; k < 150; k++) {
+      const n = 2 + (k % 3), ps = Array.from({ length: n }, (_, i) => ({ id: uid(), name: '🤖 ' + i }));
+      const g = { id: uid(), created: Date.now(), cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: k % 2 ? 'facil' : 'normal', bots: ps.map(x => x.id), hand: null } };
+      let guard = 0;
+      while (!compute(g).ended && guard++ < 300) {
+        dealHand(g);
+        const h = g.play.hand, all = [...h.deck, ...h.discard, ...Object.values(h.hands).flat()];
+        if (all.length !== 40 || new Set(all).size !== 40) bad++;
+        runBotsInstant(g); hands++;
+        const e = g.events[g.events.length - 1];
+        if (!e || Object.keys(e.scores).length !== h.order.length) bad++;
+        if (e.closer && e.kind === 'normal' && e.scores[e.closer] > 5) bad++;
+      }
+      games++; if (compute(g).ended) ended++;
+    }
+    return { games, hands, bad, ended };
+  });
+  check(`150 partidas simuladas sin errores (${sim.hands} manos)`, sim.bad === 0, JSON.stringify(sim));
+  check('todas las partidas simuladas terminan', sim.ended === sim.games, JSON.stringify(sim));
+  // partida jugada desde la pantalla
+  await p.click('[data-mode="play"]');
+  await p.fill('#plName', 'Carlos'); await p.click('[data-bots="2"]');
+  await p.click('#plStart');
+  let guard = 0, handsDone = 0;
+  while (guard++ < 600) {
+    const st = await p.evaluate(() => { const g = S.game; if (!g || !g.play) return 'nogame'; if (compute(g).ended) return 'ended'; const h = g.play.hand; if (!h) return 'nohand'; return h.phase === 'over' ? 'over' : (h.turn === me(g) ? h.phase : 'bot'); });
+    if (st === 'ended' || st === 'nogame') break;
+    if (st === 'over') { handsDone++; await p.click('#prNext'); continue; }
+    if (st === 'bot') { await p.waitForTimeout(120); continue; }
+    if (st === 'draw') { await p.click(guard % 3 ? '#pDeck' : '#pDisc'); continue; }
+    if (st === 'discard') {
+      const d = await p.evaluate(() => bestDiscard(S.game.play.hand.hands[me(S.game)]).discard);
+      await p.click(`[data-card="${d}"]`);
+      if (await p.$eval('#pClose', b => !b.disabled)) { await p.click('#pClose'); await p.click('#cOk'); }
+      else await p.click('#pDrop');
+    }
+  }
+  const fin = await p.evaluate(() => ({ ended: !!(S.game && compute(S.game).ended), hands: S.game ? compute(S.game).hand : 0 }));
+  check(`partida completa jugando desde la pantalla (${fin.hands} manos)`, fin.ended, JSON.stringify(fin));
+  await p.click('#newGame');
+  check('la partida contra la máquina queda en el historial', await p.evaluate(() => S.archive.length === 1 && S.archive[0].players.some(x => x.name.startsWith('🤖'))));
+  check('los rivales de la máquina no se añaden a jugadores habituales', await p.evaluate(() => !S.roster.some(n => n.startsWith('🤖')) && S.roster.includes('Carlos')));
+  check('sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
 await browser.close(); server.close();
 console.log(`\n${passed} correctas, ${failed} fallidas`);
 process.exit(failed ? 1 : 0);
