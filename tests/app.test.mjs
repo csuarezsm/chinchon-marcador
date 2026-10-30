@@ -214,15 +214,16 @@ console.log('Juego contra la máquina');
   check(`150 partidas simuladas sin errores (${sim.hands} manos)`, sim.bad === 0, JSON.stringify(sim));
   check('todas las partidas simuladas terminan', sim.ended === sim.games, JSON.stringify(sim));
   // partida jugada desde la pantalla
+  await p.evaluate(() => { window.PLAY_DELAY = 10; });
   await p.click('[data-mode="play"]');
   await p.fill('#plName', 'Carlos'); await p.click('[data-bots="2"]');
   await p.click('#plStart');
   let guard = 0, handsDone = 0;
-  while (guard++ < 600) {
+  while (guard++ < 4000) {
     const st = await p.evaluate(() => { const g = S.game; if (!g || !g.play) return 'nogame'; if (compute(g).ended) return 'ended'; const h = g.play.hand; if (!h) return 'nohand'; return h.phase === 'over' ? 'over' : (h.turn === me(g) ? h.phase : 'bot'); });
     if (st === 'ended' || st === 'nogame') break;
     if (st === 'over') { handsDone++; await p.click('#prNext'); continue; }
-    if (st === 'bot') { await p.waitForTimeout(120); continue; }
+    if (st === 'bot') { await p.waitForTimeout(25); continue; }
     if (st === 'draw') { await p.click(guard % 3 ? '#pDeck' : '#pDisc'); continue; }
     if (st === 'discard') {
       const d = await p.evaluate(() => bestDiscard(S.game.play.hand.hands[me(S.game)]).discard);

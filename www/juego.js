@@ -236,7 +236,7 @@ function renderTable(g, R) {
   $('#pScore').onclick = () => { openModal(`<h3>📋 Puntuaciones</h3>${historyTable(g, compute(g), false)}<div class="acts"><button class="btn-gold" id="psOk">Volver a la mesa</button></div>`); $('#psOk').onclick = closeModal; };
   if (h.phase === 'over') { showHandResult(g); return; }
   if (myOut) { runBotsInstant(g); save(); render(); return; }
-  if (isBot(g, h.turn)) playTimer = setTimeout(() => { if (S.game !== g) return; botStep(g); save(); render(); }, 750);
+  if (isBot(g, h.turn)) playTimer = setTimeout(() => { if (S.game !== g) return; botStep(g); save(); render(); }, window.PLAY_DELAY || 750);
 }
 function humanDraw(g, src) {
   const h = g.play.hand, my = me(g);
