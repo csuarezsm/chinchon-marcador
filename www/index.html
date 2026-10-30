@@ -236,7 +236,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -255,7 +255,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const $ = s => document.querySelector(s);
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+let saveWarned = false;
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); saveWarned = false; }
+  catch (e) { if (!saveWarned) { saveWarned = true; setTimeout(() => toast('⚠️ No se pudo guardar. Exporta una copia y borra partidas antiguas.'), 0); } }
+}
 
 let S = load() || {};
 S.game = S.game || null;
@@ -596,6 +600,7 @@ function showUpdate(v, url, page, note) {
   $('#uGo').onclick = () => installUpdate(url, page);
 }
 async function installUpdate(url, page) {
+  if (!String(url).startsWith('https://github.com/' + REPO + '/releases/download/')) { toast('Descarga no válida'); return; }
   const U = isNative() && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater;
   if (!U) { openExternal(page || ('https://github.com/' + REPO + '/releases/latest')); return; }
   const prog = $('#uProg'), go = $('#uGo');
@@ -744,17 +749,53 @@ const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform 
 function backupJSON() {
   return JSON.stringify({ app: 'chinchon-marcador', format: 1, version: APP_VERSION, exported: new Date().toISOString(), archive: S.archive, game: S.game, roster: S.roster, theme: S.theme, fontScale: S.fontScale, lastNames: S.lastNames, lastCfg: S.lastCfg });
 }
+const SAFE_ID = /^[A-Za-z0-9_-]{1,40}$/;
+const num = (v, d) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : d; };
+const cleanName = n => String(n == null ? '' : n).replace(/[<>"'`\u0000-\u001f]/g, '').trim().slice(0, 24);
+function cleanCfg(c) {
+  c = c || {};
+  return { limit: Math.max(1, num(c.limit, 100)), closeBonus: num(c.closeBonus, -10), chinchon: c.chinchon === 'pts' ? 'pts' : 'win', chinchonPts: num(c.chinchonPts, -50),
+    rebuyMode: ['max', 'fixed', 'none'].includes(c.rebuyMode) ? c.rebuyMode : 'max', rebuyFixed: num(c.rebuyFixed, 0), maxRebuys: Math.max(0, num(c.maxRebuys, 1)),
+    stake: Math.max(0, Number(c.stake) || 0), rebuyStake: Math.max(0, Number(c.rebuyStake) || 0) };
+}
+// Devuelve una partida con solo datos válidos (ids seguros, números de verdad, textos limpios) o null
+function cleanGame(g, archived) {
+  if (!g || typeof g !== 'object' || !Array.isArray(g.players) || !Array.isArray(g.events)) return null;
+  const map = {}, players = [];
+  for (const p of g.players.slice(0, 10)) {
+    if (!p) continue;
+    const id = SAFE_ID.test(String(p.id)) && !map[p.id] ? String(p.id) : uid();
+    map[p.id] = id; players.push({ id, name: cleanName(p.name) || 'Jugador ' + (players.length + 1) });
+  }
+  if (players.length < 2) return null;
+  const ok = id => players.some(p => p.id === id);
+  const events = [];
+  for (const e of g.events.slice(0, 2000)) {
+    if (!e) continue;
+    if (e.t === 'hand') {
+      const scores = {};
+      for (const k in (e.scores || {})) if (map[k] && ok(map[k])) scores[map[k]] = num(e.scores[k], 0);
+      events.push({ t: 'hand', dealer: map[e.dealer] || players[0].id, closer: map[e.closer] || null, kind: ['normal', 'bonus', 'chinchon'].includes(e.kind) ? e.kind : 'normal', scores, at: num(e.at, 0) });
+    } else if (e.t === 'rebuy' && map[e.p]) events.push({ t: 'rebuy', p: map[e.p], score: num(e.score, 0), at: num(e.at, 0) });
+  }
+  const out = { id: SAFE_ID.test(String(g.id)) ? String(g.id) : uid(), created: num(g.created, Date.now()), cfg: cleanCfg(g.cfg), players, firstDealer: map[g.firstDealer] || players[0].id, events };
+  if (archived) {
+    const R = compute(out);
+    Object.assign(out, { finished: num(g.finished, out.created), hands: R.hand, winnerName: R.ended ? pname(out, R.ended.winner) : '(sin terminar)' });
+  }
+  return out;
+}
 function validBackup(b) { return b && b.app === 'chinchon-marcador' && Array.isArray(b.archive); }
 // Añade lo que trae la copia sin duplicar ni borrar nada de lo que ya hay
 function mergeBackup(b) {
   const have = new Set(S.archive.map(a => a.id));
-  const nuevas = b.archive.filter(a => a && a.id && Array.isArray(a.players) && Array.isArray(a.events) && !have.has(a.id));
+  const nuevas = b.archive.slice(0, MAX_ARCHIVE).map(a => cleanGame(a, true)).filter(a => a && !have.has(a.id));
   S.archive = S.archive.concat(nuevas).sort((x, y) => (y.finished || y.created || 0) - (x.finished || x.created || 0)).slice(0, MAX_ARCHIVE);
-  if (!S.game && b.game && Array.isArray(b.game.players)) S.game = b.game;
-  (b.roster || []).forEach(n => { if (n && !S.roster.some(x => nkey(x) === nkey(n))) S.roster.push(n); });
+  const g = !S.game && cleanGame(b.game, false); if (g) S.game = g;
+  (Array.isArray(b.roster) ? b.roster : []).map(cleanName).forEach(n => { if (n && !S.roster.some(x => nkey(x) === nkey(n))) S.roster.push(n); });
   S.archive.forEach(a => a.players.forEach(p => { if (!/^Jugador \d+$/.test(p.name) && !S.roster.some(x => nkey(x) === nkey(p.name))) S.roster.push(p.name); }));
-  if (!S.theme && b.theme) { S.theme = b.theme; applyTheme(S.theme); }
-  if (!S.fontScale && b.fontScale) { S.fontScale = b.fontScale; applyFont(); }
+  if (!S.theme && THEMES[b.theme]) { S.theme = b.theme; applyTheme(S.theme); }
+  if (!S.fontScale && FONT_SIZES.some(f => f[0] === String(b.fontScale))) { S.fontScale = String(b.fontScale); applyFont(); }
   return nuevas.length;
 }
 
@@ -825,8 +866,8 @@ function importBackup() {
       try { b = JSON.parse(rd.result); } catch (e) { b = null; }
       if (!validBackup(b)) { toast('Ese archivo no es una copia de Chinchón'); return; }
       const have = new Set(S.archive.map(a => a.id));
-      const nuevas = b.archive.filter(a => a && a.id && Array.isArray(a.players) && Array.isArray(a.events) && !have.has(a.id));
-      const restoreGame = !S.game && b.game && Array.isArray(b.game.players);
+      const nuevas = b.archive.slice(0, MAX_ARCHIVE).map(a => cleanGame(a, true)).filter(a => a && !have.has(a.id));
+      const restoreGame = !S.game && !!cleanGame(b.game, false);
       confirmBox('Importar copia', `Se añadirán ${nuevas.length} partida${nuevas.length === 1 ? '' : 's'} nueva${nuevas.length === 1 ? '' : 's'} al historial (las que ya tienes no se duplican)${restoreGame ? ' y se recuperará la partida que estaba en curso' : ''}.`, 'Importar', () => {
         const n = mergeBackup(b);
         save(); render(); toast(n + ' partidas importadas'); autoBackup(true); openArchive('partidas');
@@ -1371,7 +1412,7 @@ $('#menuBtn').onclick = () => {
         <div class="mut" style="margin-top:8px;line-height:1.5">
         • Tus partidas, jugadores y ajustes se guardan <b>solo en este móvil</b>. No hay cuentas ni registro.<br>
         • La app <b>no recoge ningún dato personal</b> ni de uso, y no lleva anuncios ni rastreadores.<br>
-        • Solo se conecta a internet para <b>buscar actualizaciones</b> en GitHub (no envía información tuya) y, si tú lo pulsas, para abrir PayPal o compartir.<br>
+        • Solo se conecta a internet para <b>buscar actualizaciones</b> en GitHub (no envía ningún dato tuyo; como cualquier web, GitHub ve la dirección IP de la conexión) y, si tú lo pulsas, para abrir PayPal o compartir.<br>
         • La copia de seguridad automática se queda en el móvil; Android puede incluirla en tu copia de Google si la tienes activada.<br>
         • Responsable: IT Canarias · itcanarias.com</div></details>
       <div class="donate">
@@ -1431,7 +1472,10 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoCheckUpdates(); });
 render();
 if (S.game) keepAwake();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+if ('serviceWorker' in navigator && isNative()) {
+  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+} else if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 </script>

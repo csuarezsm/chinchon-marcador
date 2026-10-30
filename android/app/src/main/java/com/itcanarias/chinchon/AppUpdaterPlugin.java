@@ -53,7 +53,8 @@ public class AppUpdaterPlugin extends Plugin {
     @PluginMethod
     public void downloadAndInstall(PluginCall call) {
         final String startUrl = call.getString("url");
-        if (startUrl == null || !startUrl.startsWith("https://")) {
+        // Solo se aceptan descargas de las versiones publicadas de esta app
+        if (startUrl == null || !startUrl.startsWith("https://github.com/csuarezsm/chinchon-marcador/releases/download/")) {
             call.reject("Dirección de descarga no válida");
             return;
         }
