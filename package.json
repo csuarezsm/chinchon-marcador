@@ -1,6 +1,6 @@
 {
   "name": "chinchon-marcador",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "author": "IT Canarias",
   "license": "UNLICENSED",
@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
-    "@capacitor/core": "^7.0.0"
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.1.9",
+    "@capacitor/share": "^7.0.4"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

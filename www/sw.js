@@ -1,5 +1,5 @@
 // Service worker: deja la app disponible sin conexión
-const CACHE = 'chinchon-v1.0.8';
+const CACHE = 'chinchon-v1.0.9';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
