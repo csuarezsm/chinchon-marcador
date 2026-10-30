@@ -346,7 +346,7 @@ function renderSetup() {
       <button class="btn-ghost" id="addP" style="width:100%" ${d.names.length >= 10 ? 'disabled' : ''}>+ Añadir jugador</button>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
-    ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml(3)}${S.archive.length > 3 ? '<button class="btn-ghost" id="allArch" style="width:100%;margin-top:4px">Ver todas y victorias</button>' : ''}</div>` : ''}
+    ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml(3)}${S.archive.length ? '<button class="btn-ghost" id="allArch" style="width:100%;margin-top:4px">Ver clasificación y todas</button>' : ''}</div>` : ''}
     <div class="copy">© 2026 IT Canarias</div>
     <button class="btn-gold fab" id="start">Empezar partida</button>`;
   bindCfg('s_');
@@ -377,7 +377,7 @@ function renderSetup() {
     render();
   };
   document.querySelectorAll('[data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
-  const allA = $('#allArch'); if (allA) allA.onclick = openArchive;
+  const allA = $('#allArch'); if (allA) allA.onclick = () => openArchive('ranking');
 }
 
 function archiveHtml(max) {
@@ -393,8 +393,8 @@ function showArchived(i) {
     ${historyTable(a, R, false)}
     ${finalScores(a, R)}
     <div class="acts"><button class="btn-red" id="arDel">Borrar</button><button class="btn-gold" id="arClose">‹ Volver</button></div>`);
-  $('#arClose').onclick = openArchive;
-  $('#arDel').onclick = () => confirmBox('Borrar partida', 'Se quitará del historial.', 'Borrar', () => { S.archive.splice(i, 1); save(); render(); openArchive(); }, true);
+  $('#arClose').onclick = () => openArchive('partidas');
+  $('#arDel').onclick = () => confirmBox('Borrar partida', 'Se quitará del historial.', 'Borrar', () => { S.archive.splice(i, 1); save(); render(); openArchive('partidas'); }, true);
 }
 function finalScores(g, R) {
   return '<div class="hrow" style="margin-top:10px">' + g.players.slice()
@@ -440,7 +440,7 @@ function importBackup() {
         S.archive = S.archive.concat(nuevas).sort((x, y) => (y.finished || y.created || 0) - (x.finished || x.created || 0)).slice(0, MAX_ARCHIVE);
         if (restoreGame) S.game = b.game;
         if (!S.theme && b.theme) { S.theme = b.theme; applyTheme(S.theme); }
-        save(); render(); toast(nuevas.length + ' partidas importadas'); openArchive();
+        save(); render(); toast(nuevas.length + ' partidas importadas'); openArchive('partidas');
       });
     };
     rd.readAsText(f);
@@ -448,29 +448,97 @@ function importBackup() {
   inp.click();
 }
 
-function openArchive() {
+/* ---------- Clasificación, jornadas y partidas ---------- */
+const JORNADA_HOUR = 6;      // la jornada empieza a las 6:00 (una noche larga cuenta como un solo día)
+const RANK_C = 5;            // partidas "virtuales" con las que se ajusta la valoración
+const pad2 = n => String(n).padStart(2, '0');
+const nkey = n => String(n || '').trim().toLowerCase();
+function jornadaKey(ts) { const d = new Date(ts - JORNADA_HOUR * 3600e3); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function jornadaLabel(k) { const [y, m, d] = k.split('-').map(Number); const s = new Date(y, m - 1, d).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Resultado de una partida terminada: puesto y puntos de cada jugador
+function gameResult(a) {
+  const R = compute(a); if (!R.ended) return null;
+  const P = a.players, w = R.ended.winner;
+  const surv = id => { const s = R.st[id]; return s.out ? s.outHand : 1e9; };
+  const others = P.filter(p => p.id !== w).sort((x, y) => (surv(y.id) - surv(x.id)) || (R.st[x.id].total - R.st[y.id].total));
+  const order = [P.find(p => p.id === w), ...others], N = order.length;
+  const closes = {}, chin = {};
+  a.events.forEach(e => { if (e.t === 'hand' && e.closer) { closes[e.closer] = (closes[e.closer] || 0) + 1; if (e.kind === 'chinchon') chin[e.closer] = (chin[e.closer] || 0) + 1; } });
+  return {
+    ts: a.finished || a.created, N, hands: R.hand,
+    rows: order.map((p, i) => ({ key: nkey(p.name), name: p.name.trim(), pos: i + 1, win: i === 0,
+      pts: N > 1 ? Math.round(100 * (N - 1 - i) / (N - 1)) / 10 : 10,
+      rebuys: R.st[p.id].rebuys, closes: closes[p.id] || 0, chin: chin[p.id] || 0, total: R.st[p.id].total }))
+  };
+}
+function aggregate(results) {
+  const m = {};
+  results.forEach(g => g.rows.forEach(r => {
+    const o = m[r.key] || (m[r.key] = { name: r.name, pj: 0, g: 0, pts: 0, pos: 0, podios: 0, chin: 0, closes: 0, rebuys: 0 });
+    o.name = r.name; o.pj++; o.g += r.win ? 1 : 0; o.pts += r.pts; o.pos += r.pos; o.podios += r.pos <= Math.min(3, g.N - 1 || 1) ? 1 : 0;
+    o.chin += r.chin; o.closes += r.closes; o.rebuys += r.rebuys;
+  }));
+  const list = Object.values(m);
+  const totPj = list.reduce((a, o) => a + o.pj, 0), mean = totPj ? list.reduce((a, o) => a + o.pts, 0) / totPj : 5;
+  list.forEach(o => { o.avg = o.pts / o.pj; o.rating = (o.pts + RANK_C * mean) / (o.pj + RANK_C); o.avgPos = o.pos / o.pj; });
+  return list;
+}
+const fmt1 = v => (Math.round(v * 10) / 10).toLocaleString('es-ES');
+const medal = i => ['🥇', '🥈', '🥉'][i] || (i + 1) + '.';
+
+let AV = { tab: 'ranking', period: 'all', open: null };
+function openArchive(tab) {
+  if (typeof tab === 'string') AV.tab = tab;
+  const done = S.archive.map(a => ({ a, r: gameResult(a) })).filter(x => x.r);
+  const now = new Date();
+  const inPeriod = ts => { const d = new Date(ts - JORNADA_HOUR * 3600e3); return AV.period === 'all' || (AV.period === 'year' && d.getFullYear() === now.getFullYear()) || (AV.period === 'month' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()); };
+  const tabs = `<div class="kinds" style="margin:0 0 12px">${[['ranking', '🏆 Ranking'], ['jornadas', '📅 Jornadas'], ['partidas', '📜 Partidas']].map(([k, l]) => `<button data-tab="${k}" class="${AV.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  let body = '';
   if (!S.archive.length) {
-    openModal(`<h3>📜 Partidas anteriores</h3><div class="empty">Aún no hay partidas guardadas.<br>Se guardan al pulsar «Revancha», «Nueva partida» o «Terminar partida».</div>
-      <div class="menu"><button id="aImp">⬇️ Importar copia de seguridad</button></div>
-      <div class="acts"><button class="btn-gold" id="aC">Cerrar</button></div>`);
-    $('#aC').onclick = closeModal; $('#aImp').onclick = importBackup; return;
+    body = `<div class="empty">Aún no hay partidas guardadas.<br>Se guardan al pulsar «Revancha», «Nueva partida» o «Terminar partida».</div>`;
+  } else if (AV.tab === 'ranking') {
+    const list = aggregate(done.filter(x => inPeriod(x.r.ts)).map(x => x.r)).sort((a, b) => (b.rating - a.rating) || (b.g - a.g) || (b.pj - a.pj));
+    body = `<div class="kinds" style="margin:0 0 10px">${[['all', 'Siempre'], ['year', 'Este año'], ['month', 'Este mes']].map(([k, l]) => `<button data-period="${k}" class="${AV.period === k ? 'on' : ''}">${l}</button>`).join('')}</div>` +
+      (list.length ? `<div class="tbl-wrap"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th>Valor.</th><th>PJ</th><th>G</th><th>% G</th><th>Pos. media</th><th>Pts</th><th>★</th><th>↻</th></tr></thead><tbody>` +
+        list.map((o, i) => `<tr><td>${medal(i)}</td><td style="text-align:left;font-weight:700">${esc(o.name)}</td><td><b style="color:var(--gold);font-size:16px">${Math.round(o.rating * 10)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${Math.round(o.g / o.pj * 100)}%</td><td>${fmt1(o.avgPos)}º</td><td>${fmt1(o.pts)}</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
+        `</tbody></table></div>
+        <details class="sec" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">¿Cómo se calcula?</summary>
+          <div class="mut" style="margin-top:8px;line-height:1.5">
+          • En cada partida se reparten <b>10 puntos al ganador y 0 al último</b>; el resto según su puesto (va por delante quien aguanta más sin eliminarse). Así cuenta igual una partida de 3 que de 6 jugadores.<br>
+          • La <b>valoración</b> (0–100) es la media de puntos por partida, ajustada por el número de partidas jugadas: con pocas partidas se acerca a la media del grupo, y según juegas más refleja tu nivel real. Nadie se pone primero por una victoria con suerte.<br>
+          • PJ = partidas jugadas · G = ganadas · Pos. media = puesto medio · ★ = chinchones · ↻ = reenganches.<br>
+          • Solo cuentan las partidas terminadas.</div></details>`
+        : '<div class="empty">No hay partidas terminadas en este periodo.</div>');
+  } else if (AV.tab === 'jornadas') {
+    const byDay = {};
+    done.forEach(x => { const k = jornadaKey(x.r.ts); (byDay[k] = byDay[k] || []).push(x.r); });
+    const days = Object.keys(byDay).sort().reverse();
+    if (AV.open == null && days.length) AV.open = days[0];
+    body = days.length ? days.map(k => {
+      const res = byDay[k], list = aggregate(res).sort((a, b) => (b.pts - a.pts) || (b.g - a.g) || (a.avgPos - b.avgPos));
+      const isOpen = AV.open === k;
+      return `<div class="hrow" style="padding:0;overflow:hidden">
+        <div class="top" data-day="${k}" style="padding:12px;cursor:pointer"><div class="n">${esc(jornadaLabel(k))}<small>${res.length} partida${res.length === 1 ? '' : 's'} · 🏆 ${esc(list[0].name)} (${fmt1(list[0].pts)} pts)</small></div><span>${isOpen ? '▾' : '▸'}</span></div>
+        ${isOpen ? `<div class="tbl-wrap" style="border-radius:0"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th>Pts</th><th>PJ</th><th>G</th><th>Pos. media</th><th>★</th><th>↻</th></tr></thead><tbody>` +
+          list.map((o, i) => `<tr><td>${medal(i)}</td><td style="text-align:left;font-weight:700">${esc(o.name)}</td><td><b style="color:var(--gold)">${fmt1(o.pts)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${fmt1(o.avgPos)}º</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
+          `</tbody></table></div>` : ''}
+      </div>`;
+    }).join('') + '<div class="mut">Puntos por partida: 10 al ganador, 0 al último y el resto según su puesto. La jornada va de 6:00 a 6:00.</div>'
+      : '<div class="empty">Aún no hay partidas terminadas.</div>';
+  } else {
+    body = archiveHtml(S.archive.length) + `<div class="mut" style="margin:6px 0">Caben hasta ${MAX_ARCHIVE} partidas; al superarlas se borra la más antigua.</div>`;
   }
-  const wins = {}, played = {};
-  S.archive.forEach(a => {
-    a.players.forEach(p => { const k = p.name.trim(); played[k] = (played[k] || 0) + 1; });
-    if (a.winnerName && a.winnerName !== '(sin terminar)') wins[a.winnerName] = (wins[a.winnerName] || 0) + 1;
-  });
-  const rank = Object.keys(played).sort((a, b) => (wins[b] || 0) - (wins[a] || 0) || played[b] - played[a]);
-  openModal(`<h3>📜 Partidas anteriores</h3><div class="sub">${S.archive.length} partida${S.archive.length === 1 ? '' : 's'} guardada${S.archive.length === 1 ? '' : 's'}. Toca una para ver el detalle.</div>
-    <div class="sec" style="margin-bottom:10px"><h2>Victorias</h2>${rank.map((n, i) => `<div class="top" style="display:flex;justify-content:space-between;padding:5px 0;border-top:${i ? '1px solid var(--line)' : '0'}"><span>${i === 0 && wins[n] ? '🥇 ' : i === 1 && wins[n] ? '🥈 ' : i === 2 && wins[n] ? '🥉 ' : ''}${esc(n)}</span><span><b style="color:var(--gold)">${wins[n] || 0}</b> <span class="mut">de ${played[n]}</span></span></div>`).join('')}</div>
-    ${archiveHtml(S.archive.length)}
-    <div class="menu" style="margin-top:12px">
-      <button id="aExp">⬆️ Exportar copia de seguridad</button>
-      <button id="aImp">⬇️ Importar copia de seguridad</button>
-    </div>
-    <div class="mut" style="margin:-2px 0 6px">Caben hasta ${MAX_ARCHIVE} partidas; al superarlas se borra la más antigua.</div>
+  openModal(`<h3>📊 Clasificación y partidas</h3><div class="sub">${S.archive.length} partida${S.archive.length === 1 ? '' : 's'} guardada${S.archive.length === 1 ? '' : 's'}.</div>
+    ${S.archive.length ? tabs : ''}${body}
+    ${AV.tab === 'partidas' || !S.archive.length ? `<div class="menu" style="margin-top:12px">${S.archive.length ? '<button id="aExp">⬆️ Exportar copia de seguridad</button>' : ''}<button id="aImp">⬇️ Importar copia de seguridad</button></div>` : ''}
     <div class="acts"><button class="btn-gold" id="aC">Cerrar</button></div>`);
-  $('#aC').onclick = closeModal; $('#aExp').onclick = exportBackup; $('#aImp').onclick = importBackup;
+  $('#aC').onclick = closeModal;
+  const ex = $('#aExp'); if (ex) ex.onclick = exportBackup;
+  const im = $('#aImp'); if (im) im.onclick = importBackup;
+  document.querySelectorAll('#modal [data-tab]').forEach(b => b.onclick = () => openArchive(b.dataset.tab));
+  document.querySelectorAll('#modal [data-period]').forEach(b => b.onclick = () => { AV.period = b.dataset.period; openArchive(); });
+  document.querySelectorAll('#modal [data-day]').forEach(b => b.onclick = () => { AV.open = AV.open === b.dataset.day ? '' : b.dataset.day; openArchive(); });
   document.querySelectorAll('#modal [data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
 }
 
@@ -668,7 +736,7 @@ $('#menuBtn').onclick = () => {
   if (!g) {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
-      <button id="mArch">📜 Partidas anteriores</button>
+      <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -679,7 +747,7 @@ $('#menuBtn').onclick = () => {
       <button id="mPlayers">✏️ Cambiar nombres</button>
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
-      <button id="mArch">📜 Partidas anteriores</button>
+      <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -688,10 +756,10 @@ $('#menuBtn').onclick = () => {
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
   on('mTheme', openThemes);
-  on('mArch', openArchive);
+  on('mArch', () => openArchive('ranking'));
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
-      <div class="sub">v1.0.9<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="sub">v1.1.0<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
       <div class="donate">
         <div class="dt">💛 Apoya el desarrollo de esta app</div>
         <div class="dd">Es gratis y sin anuncios. Con 1&nbsp;€ nos ayudas a seguir mejorándola y a crear nuevas apps como esta. ¡Gracias!</div>
