@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e3b2c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<title>Chinchón · Marcador</title>
+<style>
+:root{
+  --bg:#0b2a20; --felt:#0e3b2c; --card:#134a37; --card2:#1a5a43; --line:#2a6b52;
+  --txt:#f3efe2; --mut:#a9c3b6; --gold:#e8b84a; --red:#e2574c; --blue:#5aa9e6; --ok:#62c98a;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:var(--felt);border-bottom:1px solid var(--line);
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px}
+header h1{font-size:19px;margin:0;flex:1;letter-spacing:.3px}
+header h1 small{display:block;font-size:12px;color:var(--mut);font-weight:500}
+main{padding:14px;max-width:720px;margin:0 auto}
+button{font:inherit;color:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--card2);cursor:pointer}
+button:active{transform:scale(.97)}
+button[disabled]{opacity:.4}
+.btn-gold{background:var(--gold);color:#2a1e00;font-weight:700}
+.btn-red{background:var(--red);color:#fff;font-weight:600}
+.btn-ghost{background:transparent;border:1px solid var(--line)}
+.icon{width:42px;height:42px;padding:0;display:grid;place-items:center;font-size:20px;background:transparent}
+.sec{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.sec h2{font-size:15px;margin:0 0 10px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px}
+label.f{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+label.f:first-of-type{border-top:0}
+label.f span{flex:1}
+label.f em{display:block;font-style:normal;font-size:12px;color:var(--mut)}
+input,select{font:inherit;color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+input[type=number]{width:90px;text-align:center}
+input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
+.plist .pr{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.plist .pr input{flex:1;min-width:0}
+.plist .pr button{padding:10px 12px}
+.dealpick{display:inline-block;width:38px;height:38px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;color:var(--mut);flex:none}
+.dealpick.on{background:var(--gold);border-color:var(--gold);color:#2a1e00;font-weight:800}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.mut{color:var(--mut);font-size:13px}
+
+/* Marcador */
+.status{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.chip{background:var(--card);border-radius:999px;padding:8px 14px;font-size:14px}
+.chip b{color:var(--gold)}
+.players{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.pc{background:var(--card);border-radius:var(--r);padding:12px;position:relative;border:2px solid transparent}
+.pc.dealer{border-color:var(--gold)}
+.pc.out{opacity:.55;background:#2b2b2b}
+.pc .nm{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:26px}
+.pc .tt{font-size:40px;font-weight:800;line-height:1.05;margin:4px 0;font-variant-numeric:tabular-nums}
+.pc .bar{height:6px;background:var(--bg);border-radius:4px;overflow:hidden}
+.pc .bar i{display:block;height:100%;background:var(--ok)}
+.pc .bar i.warn{background:var(--gold)}.pc .bar i.danger{background:var(--red)}
+.pc .ft{font-size:12px;color:var(--mut);margin-top:6px;display:flex;justify-content:space-between;gap:6px}
+.pc .badge{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;background:var(--gold);color:#2a1e00;font-size:11px;font-weight:800;display:grid;place-items:center}
+.pc .rb{margin-top:8px;width:100%;padding:8px;font-size:14px;background:var(--blue);color:#06233a;font-weight:700}
+.pc.lead .nm::after{content:" ▶";color:var(--blue);font-size:12px}
+.fab{position:fixed;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));max-width:692px;margin:0 auto;
+  padding:16px;font-size:18px;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:6}
+.winner{background:linear-gradient(135deg,#e8b84a,#c98f1c);color:#2a1e00;border-radius:var(--r);padding:18px;text-align:center;margin-bottom:14px}
+.winner .big{font-size:28px;font-weight:900}
+.winner .actions{display:flex;gap:8px;margin-top:12px}
+.winner .actions button{flex:1;background:#2a1e00;color:var(--gold);font-weight:700}
+
+/* Historial */
+.tbl-wrap{overflow-x:auto;border-radius:var(--r);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--card2);font-size:13px;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+td:first-child,th:first-child{text-align:left;padding-left:10px;color:var(--mut);position:sticky;left:0;background:var(--card)}
+th:first-child{background:var(--card2)}
+td .pt{display:block;font-size:12px;color:var(--mut)}
+td .to{font-weight:700}
+td.out{color:#777}
+td.cl .pt{color:var(--gold);font-weight:700}
+tr.rebuy td{background:rgba(90,169,230,.12);font-size:13px}
+tr.hand{cursor:pointer}
+tr.hand:active td{background:var(--card2)}
+.dl{color:var(--gold);font-size:11px}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.modal.hidden{display:none}
+.sheet{background:var(--felt);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 4px;font-size:20px}
+.sheet .sub{color:var(--mut);font-size:13px;margin-bottom:12px}
+.hrow{background:var(--card);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.hrow .top{display:flex;align-items:center;gap:10px}
+.hrow .top .n{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hrow .top .n small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+.hrow input[type=number]{width:84px;font-size:20px;font-weight:700;padding:8px}
+.closebtn{padding:8px 10px;font-size:13px;background:transparent;border:1px solid var(--line);white-space:nowrap}
+.closebtn.on{background:var(--gold);color:#2a1e00;border-color:var(--gold);font-weight:700}
+.kinds{display:flex;gap:6px;margin-top:8px}
+.kinds button{flex:1;padding:8px 6px;font-size:13px;background:var(--bg);border:1px solid var(--line)}
+.kinds button.on{background:var(--gold);color:#2a1e00;font-weight:700;border-color:var(--gold)}
+.sheet .acts{display:flex;gap:10px;margin-top:14px}
+.sheet .acts button{flex:1;padding:14px}
+.err{color:var(--red);font-size:14px;margin-top:8px;min-height:1em}
+#toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
+#toast.on{opacity:1}
+.menu button{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--card)}
+.empty{text-align:center;color:var(--mut);padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Chinchón<small id="subtitle">Marcador de puntos</small></h1>
+  <button class="icon" id="menuBtn" aria-label="Menú">⋮</button>
+</header>
+<main id="app"></main>
+<div id="modal" class="modal hidden"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= Estado y persistencia ================= */
+const KEY = 'chinchon.v1';
+const DEF_CFG = {
+  limit: 100,          // eliminado al pasar de este total
+  closeBonus: -10,     // puntos al cerrar con todo ligado
+  chinchon: 'win',     // 'win' = gana la partida | 'pts' = resta chinchonPts
+  chinchonPts: -50,
+  rebuyMode: 'max',    // 'max' = entra con los puntos del que más tiene | 'fixed' | 'none'
+  rebuyFixed: 0,
+  maxRebuys: 1,        // 0 = sin límite
+  stake: 0,            // importe de entrada (€) – opcional
+  rebuyStake: 0        // importe por reenganche (€)
+};
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = s => document.querySelector(s);
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let S = load() || {};
+S.game = S.game || null;
+S.draft = S.draft || {
+  names: (S.lastNames && S.lastNames.length) ? S.lastNames.slice() : ['', '', ''],
+  dealer: 0,
+  cfg: Object.assign({}, DEF_CFG, S.lastCfg || {})
+};
+S.archive = S.archive || [];
+
+/* ================= Motor de la partida ================= */
+function compute(g) {
+  const c = g.cfg, P = g.players, order = P.map(p => p.id);
+  const st = {};
+  P.forEach(p => st[p.id] = { total: 0, out: false, rebuys: 0, outHand: null });
+  let lastDealer = null, hand = 0, ended = null;
+  const rows = [];
+  g.events.forEach((e, idx) => {
+    if (ended && ended.by === 'chinchon') return;
+    if (e.t === 'hand') {
+      hand++;
+      const applied = {};
+      for (const id in e.scores) {
+        if (st[id] && !st[id].out) { st[id].total += e.scores[id]; applied[id] = e.scores[id]; }
+      }
+      lastDealer = e.dealer;
+      const newlyOut = [];
+      P.forEach(p => { const s = st[p.id]; if (!s.out && s.total > c.limit) { s.out = true; s.outHand = hand; newlyOut.push(p.id); } });
+      if (e.kind === 'chinchon' && c.chinchon === 'win' && e.closer) ended = { by: 'chinchon', winner: e.closer };
+      rows.push({ type: 'hand', idx, n: hand, e, applied, totals: Object.fromEntries(P.map(p => [p.id, { t: st[p.id].total, out: st[p.id].out }])), newlyOut });
+    } else if (e.t === 'rebuy') {
+      const s = st[e.p];
+      const valid = s && s.out;
+      if (valid) { s.out = false; s.total = e.score; s.rebuys++; s.outHand = null; }
+      rows.push({ type: 'rebuy', idx, n: hand, e, valid });
+    }
+  });
+  const active = P.filter(p => !st[p.id].out);
+  if (!ended && hand > 0 && active.length <= 1) {
+    const w = active[0] ? active[0].id : P.slice().sort((a, b) => st[a.id].total - st[b.id].total)[0].id;
+    ended = { by: 'last', winner: w };
+  }
+  // Siguiente en dar: el siguiente jugador activo en el orden de la mesa
+  let next = null;
+  if (lastDealer == null) next = st[g.firstDealer] && !st[g.firstDealer].out ? g.firstDealer : (active[0] && active[0].id);
+  else {
+    const i = order.indexOf(lastDealer);
+    for (let k = 1; k <= order.length; k++) { const id = order[(i + k) % order.length]; if (!st[id].out) { next = id; break; } }
+  }
+  // Quién sale (el de la derecha/siguiente del que da)
+  let lead = null;
+  if (next) { const i = order.indexOf(next); for (let k = 1; k < order.length; k++) { const id = order[(i + k) % order.length]; if (!st[id].out) { lead = id; break; } } }
+  const totalRebuys = P.reduce((a, p) => a + st[p.id].rebuys, 0);
+  const pot = (c.stake || 0) * P.length + (c.rebuyStake || 0) * totalRebuys;
+  return { st, active, hand, ended, next, lead, rows, pot, totalRebuys };
+}
+
+function rebuyScore(g, R) {
+  if (g.cfg.rebuyMode === 'fixed') return Number(g.cfg.rebuyFixed) || 0;
+  return R.active.length ? Math.max(...R.active.map(p => R.st[p.id].total)) : 0;
+}
+function canRebuy(g, R, pid) {
+  const s = R.st[pid], c = g.cfg;
+  if (!s.out || c.rebuyMode === 'none') return false;
+  if (R.ended && R.ended.by === 'chinchon') return false;
+  if (!R.active.length) return false;
+  if (c.maxRebuys > 0 && s.rebuys >= c.maxRebuys) return false;
+  return true;
+}
+const pname = (g, id) => (g.players.find(p => p.id === id) || {}).name || '?';
+
+/* ================= Utilidades UI ================= */
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2000); }
+function vibrate(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+function openModal(html) { const m = $('#modal'); m.innerHTML = '<div class="sheet">' + html + '</div>'; m.classList.remove('hidden'); }
+function closeModal() { const m = $('#modal'); m.classList.add('hidden'); m.innerHTML = ''; }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+function confirmBox(title, text, okLabel, onOk, danger) {
+  openModal(`<h3>${esc(title)}</h3><div class="sub">${esc(text)}</div>
+    <div class="acts"><button class="btn-ghost" id="cNo">Cancelar</button><button class="${danger ? 'btn-red' : 'btn-gold'}" id="cOk">${esc(okLabel)}</button></div>`);
+  $('#cNo').onclick = closeModal;
+  $('#cOk').onclick = () => { closeModal(); onOk(); };
+}
+
+/* Mantener la pantalla encendida durante la partida */
+let wakeLock = null;
+async function keepAwake() {
+  try { if (S.game && 'wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); } } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+/* ================= Render principal ================= */
+function render() {
+  save();
+  if (S.game) renderGame(); else renderSetup();
+}
+
+/* ---------- Configuración de partida nueva ---------- */
+function cfgFields(cfg, prefix) {
+  return `
+  <label class="f"><span>Eliminado al pasar de<em>Límite de puntos</em></span><input type="number" inputmode="numeric" id="${prefix}limit" value="${cfg.limit}"></label>
+  <label class="f"><span>Cerrar con todo ligado<em>Puntos para quien cierra sin cartas sueltas</em></span><input type="number" inputmode="numeric" id="${prefix}closeBonus" value="${cfg.closeBonus}"></label>
+  <label class="f"><span>Chinchón<em>Escalera de 7 del mismo palo</em></span>
+    <select id="${prefix}chinchon"><option value="win" ${cfg.chinchon === 'win' ? 'selected' : ''}>Gana la partida</option><option value="pts" ${cfg.chinchon === 'pts' ? 'selected' : ''}>Resta puntos</option></select></label>
+  <label class="f" id="${prefix}chPtsRow" style="${cfg.chinchon === 'pts' ? '' : 'display:none'}"><span>Puntos por chinchón</span><input type="number" inputmode="numeric" id="${prefix}chinchonPts" value="${cfg.chinchonPts}"></label>
+  <label class="f"><span>Reenganche<em>Con qué puntos vuelve el eliminado</em></span>
+    <select id="${prefix}rebuyMode">
+      <option value="max" ${cfg.rebuyMode === 'max' ? 'selected' : ''}>Igual que el que más tiene</option>
+      <option value="fixed" ${cfg.rebuyMode === 'fixed' ? 'selected' : ''}>Puntos fijos</option>
+      <option value="none" ${cfg.rebuyMode === 'none' ? 'selected' : ''}>Sin reenganche</option>
+    </select></label>
+  <label class="f" id="${prefix}rbFixedRow" style="${cfg.rebuyMode === 'fixed' ? '' : 'display:none'}"><span>Vuelve con</span><input type="number" inputmode="numeric" id="${prefix}rebuyFixed" value="${cfg.rebuyFixed}"></label>
+  <label class="f"><span>Reenganches por jugador<em>0 = sin límite</em></span><input type="number" inputmode="numeric" min="0" id="${prefix}maxRebuys" value="${cfg.maxRebuys}"></label>
+  <label class="f"><span>Entrada (€)<em>Opcional, para llevar el bote</em></span><input type="number" inputmode="decimal" step="0.5" min="0" id="${prefix}stake" value="${cfg.stake}"></label>
+  <label class="f"><span>Reenganche (€)</span><input type="number" inputmode="decimal" step="0.5" min="0" id="${prefix}rebuyStake" value="${cfg.rebuyStake}"></label>`;
+}
+function bindCfg(prefix) {
+  const ch = $('#' + prefix + 'chinchon'), rb = $('#' + prefix + 'rebuyMode');
+  ch.onchange = () => $('#' + prefix + 'chPtsRow').style.display = ch.value === 'pts' ? '' : 'none';
+  rb.onchange = () => $('#' + prefix + 'rbFixedRow').style.display = rb.value === 'fixed' ? '' : 'none';
+}
+function readCfg(prefix) {
+  const n = (id, d) => { const v = parseFloat($('#' + prefix + id).value); return isNaN(v) ? d : v; };
+  return {
+    limit: Math.round(n('limit', 100)), closeBonus: Math.round(n('closeBonus', -10)),
+    chinchon: $('#' + prefix + 'chinchon').value, chinchonPts: Math.round(n('chinchonPts', -50)),
+    rebuyMode: $('#' + prefix + 'rebuyMode').value, rebuyFixed: Math.round(n('rebuyFixed', 0)),
+    maxRebuys: Math.max(0, Math.round(n('maxRebuys', 1))), stake: Math.max(0, n('stake', 0)), rebuyStake: Math.max(0, n('rebuyStake', 0))
+  };
+}
+
+function renderSetup() {
+  $('#subtitle').textContent = 'Nueva partida';
+  const d = S.draft;
+  const rows = d.names.map((n, i) => `
+    <div class="pr">
+      <button class="dealpick ${d.dealer === i ? 'on' : ''}" data-deal="${i}" title="Da primero">${d.dealer === i ? 'DA' : i + 1}</button>
+      <input type="text" maxlength="18" placeholder="Jugador ${i + 1}" value="${esc(n)}" data-name="${i}" autocomplete="off">
+      <button data-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+      <button data-del="${i}" ${d.names.length <= 2 ? 'disabled' : ''} aria-label="Quitar">✕</button>
+    </div>`).join('');
+  $('#app').innerHTML = `
+    <div class="sec plist">
+      <h2>Jugadores</h2>
+      <div class="mut" style="margin-bottom:10px">Ponlos en el orden en que estáis sentados. Toca el círculo para elegir quién da primero.</div>
+      ${rows}
+      <button class="btn-ghost" id="addP" style="width:100%" ${d.names.length >= 10 ? 'disabled' : ''}>+ Añadir jugador</button>
+    </div>
+    <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
+    ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml()}</div>` : ''}
+    <button class="btn-gold fab" id="start">Empezar partida</button>`;
+  bindCfg('s_');
+  const syncNames = () => document.querySelectorAll('[data-name]').forEach(el => d.names[+el.dataset.name] = el.value);
+  const syncCfg = () => { d.cfg = readCfg('s_'); };
+  document.querySelectorAll('[data-name]').forEach(el => el.oninput = () => { d.names[+el.dataset.name] = el.value; save(); });
+  document.querySelectorAll('.sec input, .sec select').forEach(el => { if (!el.dataset.name) el.addEventListener('change', () => { syncCfg(); save(); }); });
+  document.querySelectorAll('[data-deal]').forEach(b => b.onclick = () => { syncNames(); syncCfg(); d.dealer = +b.dataset.deal; render(); });
+  document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+    syncNames(); syncCfg(); const i = +b.dataset.up; [d.names[i - 1], d.names[i]] = [d.names[i], d.names[i - 1]];
+    if (d.dealer === i) d.dealer = i - 1; else if (d.dealer === i - 1) d.dealer = i; render();
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    syncNames(); syncCfg(); const i = +b.dataset.del; d.names.splice(i, 1);
+    if (d.dealer >= d.names.length || d.dealer === i) d.dealer = 0; else if (d.dealer > i) d.dealer--; render();
+  });
+  $('#addP').onclick = () => { syncNames(); syncCfg(); d.names.push(''); render(); setTimeout(() => { const ins = document.querySelectorAll('[data-name]'); ins[ins.length - 1].focus(); }, 50); };
+  $('#start').onclick = () => {
+    syncNames(); syncCfg();
+    const names = d.names.map((n, i) => n.trim() || ('Jugador ' + (i + 1)));
+    const lower = names.map(n => n.toLowerCase());
+    if (new Set(lower).size !== lower.length) { toast('Hay nombres repetidos'); return; }
+    if (names.length < 2) { toast('Mínimo 2 jugadores'); return; }
+    const players = names.map(n => ({ id: uid(), name: n }));
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[d.dealer].id, events: [] };
+    S.lastNames = d.names.slice(); S.lastCfg = Object.assign({}, d.cfg);
+    keepAwake();
+    render();
+  };
+  document.querySelectorAll('[data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
+}
+
+function archiveHtml() {
+  return S.archive.slice(0, 15).map((a, i) => {
+    const dt = new Date(a.finished || a.created);
+    return `<div class="hrow" data-arch="${i}" style="cursor:pointer"><div class="top"><div class="n">🏆 ${esc(a.winnerName)}<small>${dt.toLocaleDateString('es-ES')} ${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${a.hands} manos · ${a.players.map(p => esc(p.name)).join(', ')}</small></div></div></div>`;
+  }).join('');
+}
+function showArchived(i) {
+  const a = S.archive[i]; if (!a) return;
+  const R = compute(a);
+  openModal(`<h3>🏆 ${esc(a.winnerName)}</h3><div class="sub">${a.hands} manos · ${new Date(a.finished || a.created).toLocaleString('es-ES')}</div>
+    ${historyTable(a, R, false)}
+    <div class="acts"><button class="btn-red" id="arDel">Borrar</button><button class="btn-gold" id="arClose">Cerrar</button></div>`);
+  $('#arClose').onclick = closeModal;
+  $('#arDel').onclick = () => { S.archive.splice(i, 1); closeModal(); render(); };
+}
+
+/* ---------- Partida en curso ---------- */
+function renderGame() {
+  const g = S.game, R = compute(g), c = g.cfg;
+  $('#subtitle').textContent = R.ended ? 'Partida terminada' : `Mano ${R.hand + 1} · límite ${c.limit}`;
+  let html = '';
+  if (R.ended) {
+    const anyRebuy = g.players.some(p => canRebuy(g, R, p.id));
+    html += `<div class="winner"><div>${R.ended.by === 'chinchon' ? '¡CHINCHÓN!' : 'Ganador'}</div>
+      <div class="big">🏆 ${esc(pname(g, R.ended.winner))}</div>
+      <div style="font-size:14px;margin-top:4px">${R.hand} manos${R.pot ? ` · Bote ${fmtMoney(R.pot)}` : ''}</div>
+      ${anyRebuy ? '<div style="font-size:13px;margin-top:6px">Aún se puede reenganchar algún jugador para seguir.</div>' : ''}
+      <div class="actions"><button id="rematch">Revancha</button><button id="newGame">Nueva partida</button></div></div>`;
+  } else {
+    html += `<div class="status">
+      <div class="chip">Da: <b>${esc(pname(g, R.next))}</b></div>
+      ${R.lead ? `<div class="chip">Sale: <b>${esc(pname(g, R.lead))}</b></div>` : ''}
+      ${R.pot ? `<div class="chip">Bote: <b>${fmtMoney(R.pot)}</b></div>` : ''}
+    </div>`;
+  }
+  html += '<div class="players">' + g.players.map(p => {
+    const s = R.st[p.id], pct = Math.max(0, Math.min(100, s.total / c.limit * 100));
+    const cls = pct >= 85 ? 'danger' : pct >= 65 ? 'warn' : '';
+    const isDealer = !R.ended && p.id === R.next, isLead = !R.ended && p.id === R.lead;
+    const left = c.limit - s.total;
+    return `<div class="pc ${s.out ? 'out' : ''} ${isDealer ? 'dealer' : ''} ${isLead ? 'lead' : ''}">
+      ${isDealer ? '<div class="badge">DA</div>' : ''}
+      <div class="nm">${esc(p.name)}</div>
+      <div class="tt">${s.total}</div>
+      <div class="bar"><i class="${cls}" style="width:${pct}%"></i></div>
+      <div class="ft"><span>${s.out ? 'Eliminado' : (left >= 0 ? 'Le quedan ' + left : '')}</span><span>${s.rebuys ? '↻ ' + s.rebuys : ''}</span></div>
+      ${canRebuy(g, R, p.id) ? `<button class="rb" data-rebuy="${p.id}">Reenganchar (${rebuyScore(g, R)})</button>` : ''}
+    </div>`;
+  }).join('') + '</div>';
+
+  html += `<div class="sec" style="padding:0;background:none"><h2 style="padding:0 2px">Manos</h2>
+    ${R.rows.length ? historyTable(g, R, true) : '<div class="empty">Aún no hay manos. Pulsa «Anotar mano» al terminar cada mano.</div>'}</div>`;
+  if (!R.ended) html += `<button class="btn-gold fab" id="addHand">＋ Anotar mano ${R.hand + 1}</button>`;
+  $('#app').innerHTML = html;
+
+  const add = $('#addHand'); if (add) add.onclick = () => openHand(null);
+  document.querySelectorAll('[data-rebuy]').forEach(b => b.onclick = () => doRebuy(b.dataset.rebuy));
+  document.querySelectorAll('tr.hand').forEach(tr => tr.onclick = () => openHand(+tr.dataset.idx));
+  document.querySelectorAll('tr.rebuy').forEach(tr => tr.onclick = () => {
+    const idx = +tr.dataset.idx;
+    confirmBox('Anular reenganche', 'Se quitará este reenganche del historial.', 'Anular', () => { g.events.splice(idx, 1); render(); }, true);
+  });
+  const rm = $('#rematch'); if (rm) rm.onclick = () => finishAndNew(true);
+  const ng = $('#newGame'); if (ng) ng.onclick = () => finishAndNew(false);
+  if (R.ended && !g._celebrated) { g._celebrated = true; vibrate([80, 60, 160]); save(); }
+  if (!R.ended && g._celebrated) { delete g._celebrated; save(); }
+}
+function fmtMoney(v) { return (Math.round(v * 100) / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }); }
+
+function historyTable(g, R, interactive) {
+  const P = g.players;
+  const head = '<tr><th>#</th>' + P.map(p => `<th>${esc(p.name)}</th>`).join('') + '</tr>';
+  const body = R.rows.map(r => {
+    if (r.type === 'rebuy') {
+      return `<tr class="${interactive ? 'rebuy' : ''}" data-idx="${r.idx}" style="${r.valid ? '' : 'text-decoration:line-through'}"><td>↻</td><td colspan="${P.length}" style="text-align:left">${esc(pname(g, r.e.p))} se reengancha con ${r.e.score}${r.valid ? '' : ' (no válido)'}</td></tr>`;
+    }
+    const e = r.e;
+    return `<tr class="${interactive ? 'hand' : ''}" data-idx="${r.idx}"><td>${r.n} <span class="dl">${esc(initials(pname(g, e.dealer)))}</span></td>` + P.map(p => {
+      const t = r.totals[p.id];
+      if (!(p.id in r.applied)) return `<td class="out">${r.newlyOut.includes(p.id) ? '' : '—'}</td>`;
+      const v = r.applied[p.id];
+      const isCl = e.closer === p.id;
+      const mark = isCl ? (e.kind === 'chinchon' ? '★' : e.kind === 'bonus' ? '✓' : '✓') : '';
+      return `<td class="${isCl ? 'cl' : ''}"><span class="pt">${mark}${v > 0 ? '+' + v : v}</span><span class="to" style="${t.out ? 'color:var(--red)' : ''}">${t.t}${r.newlyOut.includes(p.id) ? ' ✗' : ''}</span></td>`;
+    }).join('') + '</tr>';
+  }).join('');
+  return `<div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    ${interactive ? '<div class="mut" style="margin-top:6px">Toca una mano para corregirla. ✓ cerró · ★ chinchón · ✗ eliminado · iniciales = quién dio.</div>' : ''}`;
+}
+function initials(n) { return n.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase(); }
+
+function doRebuy(pid) {
+  const g = S.game, R = compute(g), score = rebuyScore(g, R);
+  const money = g.cfg.rebuyStake ? ` Pone ${fmtMoney(g.cfg.rebuyStake)} al bote.` : '';
+  confirmBox('Reenganchar a ' + pname(g, pid), `Vuelve a la partida con ${score} puntos.${money}`, 'Reenganchar', () => {
+    g.events.push({ t: 'rebuy', p: pid, score, at: Date.now() });
+    vibrate(40); toast(pname(g, pid) + ' vuelve con ' + score);
+    render();
+  });
+}
+
+function finishAndNew(rematch) {
+  const g = S.game, R = compute(g);
+  if (R.hand > 0) {
+    S.archive.unshift({ ...g, finished: Date.now(), hands: R.hand, winnerName: R.ended ? pname(g, R.ended.winner) : '(sin terminar)' });
+    S.archive = S.archive.slice(0, 30);
+  }
+  if (rematch) {
+    // Revancha: mismos jugadores y reglas; da el siguiente al que dio primero
+    const order = g.players.map(p => p.id), i = order.indexOf(g.firstDealer);
+    const players = g.players.map(p => ({ id: uid(), name: p.name }));
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, g.cfg), players, firstDealer: players[(i + 1) % players.length].id, events: [] };
+  } else {
+    S.draft.names = g.players.map(p => p.name); S.draft.cfg = Object.assign({}, g.cfg); S.draft.dealer = 0;
+    S.game = null;
+  }
+  render();
+}
+
+/* ---------- Anotar / corregir mano ---------- */
+function openHand(editIdx) {
+  const g = S.game, c = g.cfg;
+  const editing = editIdx != null;
+  const R = compute(g);
+  let participants, H;
+  if (editing) {
+    const e = g.events[editIdx];
+    participants = g.players.filter(p => p.id in e.scores);
+    H = { dealer: e.dealer, closer: e.closer || null, kind: e.kind || 'normal', scores: Object.assign({}, e.scores) };
+  } else {
+    participants = R.active;
+    H = { dealer: R.next, closer: null, kind: 'normal', scores: {} };
+  }
+  const n = editing ? R.rows.find(r => r.idx === editIdx).n : R.hand + 1;
+
+  const draw = () => {
+    const rowsHtml = participants.map(p => {
+      const isCl = H.closer === p.id;
+      const fixed = isCl && H.kind !== 'normal';
+      const val = fixed ? (H.kind === 'bonus' ? c.closeBonus : (c.chinchon === 'win' ? 0 : c.chinchonPts)) : (H.scores[p.id] ?? '');
+      return `<div class="hrow">
+        <div class="top">
+          <div class="n">${esc(p.name)}<small>${editing ? '' : 'Lleva ' + R.st[p.id].total}${p.id === H.dealer ? (editing ? 'dio' : ' · da') : ''}</small></div>
+          <button class="closebtn ${isCl ? 'on' : ''}" data-close="${p.id}">${isCl ? '✓ Cerró' : 'Cerró'}</button>
+          <input type="number" inputmode="numeric" data-sc="${p.id}" value="${val}" ${fixed ? 'disabled' : ''} placeholder="–">
+        </div>
+        ${isCl ? `<div class="kinds">
+          <button data-kind="normal" class="${H.kind === 'normal' ? 'on' : ''}">Normal</button>
+          <button data-kind="bonus" class="${H.kind === 'bonus' ? 'on' : ''}">Todo ligado (${c.closeBonus})</button>
+          <button data-kind="chinchon" class="${H.kind === 'chinchon' ? 'on' : ''}">★ Chinchón</button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+    openModal(`
+      <h3>${editing ? 'Corregir' : 'Anotar'} mano ${n}</h3>
+      <div class="sub">Puntos de las cartas sin ligar de cada jugador. Marca quién cerró.</div>
+      <label class="f" style="margin-bottom:8px"><span>Dio</span>
+        <select id="hDealer">${(editing ? g.players : participants).map(p => `<option value="${p.id}" ${p.id === H.dealer ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+      ${rowsHtml}
+      <div class="err" id="hErr"></div>
+      <div class="acts">
+        ${editing ? '<button class="btn-red" id="hDel">Borrar</button>' : '<button class="btn-ghost" id="hCancel">Cancelar</button>'}
+        <button class="btn-gold" id="hSave">Guardar</button>
+      </div>`);
+    const grab = () => document.querySelectorAll('[data-sc]').forEach(el => { if (!el.disabled) H.scores[el.dataset.sc] = el.value === '' ? '' : el.value; });
+    $('#hDealer').onchange = e => { grab(); H.dealer = e.target.value; draw(); };
+    document.querySelectorAll('[data-sc]').forEach(el => el.oninput = () => { H.scores[el.dataset.sc] = el.value; });
+    document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { grab(); const id = b.dataset.close; if (H.closer === id) { H.closer = null; H.kind = 'normal'; } else { H.closer = id; } draw(); });
+    document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { grab(); H.kind = b.dataset.kind; draw(); });
+    const cancel = $('#hCancel'); if (cancel) cancel.onclick = closeModal;
+    const del = $('#hDel'); if (del) del.onclick = () => confirmBox('Borrar mano ' + n, 'Se recalcularán todos los totales.', 'Borrar', () => { g.events.splice(editIdx, 1); render(); }, true);
+    $('#hSave').onclick = () => {
+      grab();
+      const scores = {}; const err = $('#hErr');
+      for (const p of participants) {
+        if (H.closer === p.id && H.kind !== 'normal') {
+          scores[p.id] = H.kind === 'bonus' ? c.closeBonus : (c.chinchon === 'win' ? 0 : c.chinchonPts);
+          continue;
+        }
+        const raw = H.scores[p.id];
+        if (raw === '' || raw == null) {
+          if (H.closer === p.id) { scores[p.id] = 0; continue; }
+          err.textContent = 'Falta la puntuación de ' + p.name + '.'; return;
+        }
+        const v = Number(raw);
+        if (!Number.isFinite(v) || Math.round(v) !== v) { err.textContent = 'Puntuación no válida para ' + p.name + '.'; return; }
+        if (v < 0 && H.closer !== p.id) { err.textContent = 'Solo quien cierra puede tener puntos negativos.'; return; }
+        scores[p.id] = v;
+      }
+      const ev = { t: 'hand', dealer: H.dealer, closer: H.closer, kind: H.closer ? H.kind : 'normal', scores, at: Date.now() };
+      if (editing) { ev.at = g.events[editIdx].at; g.events[editIdx] = ev; }
+      else g.events.push(ev);
+      closeModal(); vibrate(30);
+      const R2 = compute(g);
+      const outs = (R2.rows.find(r => r.type === 'hand' && r.n === n) || {}).newlyOut || [];
+      if (!editing && outs.length) toast('Eliminado: ' + outs.map(id => pname(g, id)).join(', '));
+      else toast(editing ? 'Mano corregida' : 'Mano ' + n + ' anotada');
+      render();
+    };
+  };
+  draw();
+  if (!editing) { const first = document.querySelector('[data-sc]:not([disabled])'); if (first) first.focus(); }
+}
+
+/* ---------- Menú ---------- */
+$('#menuBtn').onclick = () => {
+  const g = S.game;
+  if (!g) {
+    openModal(`<h3>Menú</h3><div class="menu">
+      ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
+      <button id="mAbout">ℹ️ Acerca de</button>
+      <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
+  } else {
+    openModal(`<h3>Menú</h3><div class="menu">
+      <button id="mUndo" ${g.events.length ? '' : 'disabled'}>↶ Deshacer último movimiento</button>
+      <button id="mRules">⚙️ Reglas de esta partida</button>
+      <button id="mPlayers">✏️ Cambiar nombres</button>
+      <button id="mShare">📋 Copiar resumen</button>
+      <button id="mEnd">🏁 Terminar partida</button>
+      <button id="mAbout">ℹ️ Acerca de</button>
+      <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
+  }
+  const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
+  on('mClose', closeModal);
+  on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
+  on('mAbout', () => { openModal(`<h3>Chinchón · Marcador</h3><div class="sub">IT Canarias · v1.0.0<br>Todo se guarda en el propio móvil. Funciona sin conexión.</div><div class="acts"><button class="btn-gold" id="ok">Vale</button></div>`); $('#ok').onclick = closeModal; });
+  on('mUndo', () => {
+    const last = g.events[g.events.length - 1];
+    const what = last.t === 'rebuy' ? 'el reenganche de ' + pname(g, last.p) : 'la última mano';
+    confirmBox('Deshacer', 'Se borrará ' + what + '.', 'Deshacer', () => { g.events.pop(); render(); toast('Deshecho'); });
+  });
+  on('mRules', () => {
+    openModal(`<h3>Reglas de esta partida</h3><div class="sub">Si las cambias, se recalcula todo el marcador.</div>${cfgFields(g.cfg, 'g_')}
+      <div class="acts"><button class="btn-ghost" id="rC">Cancelar</button><button class="btn-gold" id="rS">Guardar</button></div>`);
+    bindCfg('g_'); $('#rC').onclick = closeModal;
+    $('#rS').onclick = () => { g.cfg = readCfg('g_'); S.lastCfg = Object.assign({}, g.cfg); closeModal(); render(); toast('Reglas actualizadas'); };
+  });
+  on('mPlayers', () => {
+    openModal(`<h3>Nombres</h3>${g.players.map(p => `<div class="hrow"><input type="text" maxlength="18" style="width:100%" data-pn="${p.id}" value="${esc(p.name)}"></div>`).join('')}
+      <div class="acts"><button class="btn-ghost" id="pC">Cancelar</button><button class="btn-gold" id="pS">Guardar</button></div>`);
+    $('#pC').onclick = closeModal;
+    $('#pS').onclick = () => { document.querySelectorAll('[data-pn]').forEach(el => { const p = g.players.find(x => x.id === el.dataset.pn); if (el.value.trim()) p.name = el.value.trim(); }); closeModal(); render(); };
+  });
+  on('mShare', async () => {
+    const R = compute(g);
+    const lines = ['Chinchón · ' + new Date(g.created).toLocaleDateString('es-ES') + ' · ' + R.hand + ' manos'];
+    g.players.slice().sort((a, b) => (R.st[a.id].out - R.st[b.id].out) || (R.st[a.id].total - R.st[b.id].total))
+      .forEach(p => { const s = R.st[p.id]; lines.push(`${p.name}: ${s.total}${s.out ? ' (eliminado)' : ''}${s.rebuys ? ' ↻' + s.rebuys : ''}`); });
+    if (R.ended) lines.push('🏆 Gana ' + pname(g, R.ended.winner));
+    if (R.pot) lines.push('Bote: ' + fmtMoney(R.pot));
+    const txt = lines.join('\n');
+    try { if (navigator.share) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); toast('Copiado'); } } catch (e) { }
+    closeModal();
+  });
+  on('mEnd', () => confirmBox('Terminar partida', 'Se guardará en el historial y volverás a la pantalla de inicio.', 'Terminar', () => finishAndNew(false), true));
+};
+
+/* ================= Arranque ================= */
+render();
+if (S.game) keepAwake();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>

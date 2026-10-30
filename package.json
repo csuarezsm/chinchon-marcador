@@ -1,0 +1,19 @@
+{
+  "name": "chinchon-marcador",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Marcador de puntos para el chinchón (IT Canarias)",
+  "scripts": {
+    "sync": "npx cap sync android",
+    "open": "npx cap open android",
+    "icons": "npx @capacitor/assets generate --android --iconBackgroundColor '#0e3b2c' --splashBackgroundColor '#0b2a20'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}
