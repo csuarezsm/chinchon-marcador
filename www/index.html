@@ -15,7 +15,7 @@
 :root{
   --bg:#0b2a20; --felt:#0e3b2c; --card:#134a37; --card2:#1a5a43; --line:#2a6b52;
   --txt:#f3efe2; --mut:#a9c3b6; --gold:#e8b84a; --red:#e2574c; --blue:#5aa9e6; --ok:#62c98a;
-  --r:14px;
+  --r:14px; --on-gold:#2a1e00; --on-blue:#06233a; --outbg:#2b2b2b;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -28,7 +28,7 @@ main{padding:14px;max-width:720px;margin:0 auto}
 button{font:inherit;color:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--card2);cursor:pointer}
 button:active{transform:scale(.97)}
 button[disabled]{opacity:.4}
-.btn-gold{background:var(--gold);color:#2a1e00;font-weight:700}
+.btn-gold{background:var(--gold);color:var(--on-gold);font-weight:700}
 .btn-red{background:var(--red);color:#fff;font-weight:600}
 .btn-ghost{background:transparent;border:1px solid var(--line)}
 .icon{width:42px;height:42px;padding:0;display:grid;place-items:center;font-size:20px;background:transparent}
@@ -45,7 +45,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 .plist .pr input{flex:1;min-width:0}
 .plist .pr button{padding:10px 12px}
 .dealpick{display:inline-block;width:38px;height:38px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;color:var(--mut);flex:none}
-.dealpick.on{background:var(--gold);border-color:var(--gold);color:#2a1e00;font-weight:800}
+.dealpick.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold);font-weight:800}
 .row{display:flex;gap:10px}
 .row>*{flex:1}
 .mut{color:var(--mut);font-size:13px}
@@ -57,22 +57,22 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 .players{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .pc{background:var(--card);border-radius:var(--r);padding:12px;position:relative;border:2px solid transparent}
 .pc.dealer{border-color:var(--gold)}
-.pc.out{opacity:.55;background:#2b2b2b}
+.pc.out{opacity:.55;background:var(--outbg)}
 .pc .nm{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:26px}
 .pc .tt{font-size:40px;font-weight:800;line-height:1.05;margin:4px 0;font-variant-numeric:tabular-nums}
 .pc .bar{height:6px;background:var(--bg);border-radius:4px;overflow:hidden}
 .pc .bar i{display:block;height:100%;background:var(--ok)}
 .pc .bar i.warn{background:var(--gold)}.pc .bar i.danger{background:var(--red)}
 .pc .ft{font-size:12px;color:var(--mut);margin-top:6px;display:flex;justify-content:space-between;gap:6px}
-.pc .badge{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;background:var(--gold);color:#2a1e00;font-size:11px;font-weight:800;display:grid;place-items:center}
-.pc .rb{margin-top:8px;width:100%;padding:8px;font-size:14px;background:var(--blue);color:#06233a;font-weight:700}
+.pc .badge{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;background:var(--gold);color:var(--on-gold);font-size:11px;font-weight:800;display:grid;place-items:center}
+.pc .rb{margin-top:8px;width:100%;padding:8px;font-size:14px;background:var(--blue);color:var(--on-blue);font-weight:700}
 .pc.lead .nm::after{content:" ▶";color:var(--blue);font-size:12px}
 .fab{position:fixed;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));max-width:692px;margin:0 auto;
   padding:16px;font-size:18px;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:6}
-.winner{background:linear-gradient(135deg,#e8b84a,#c98f1c);color:#2a1e00;border-radius:var(--r);padding:18px;text-align:center;margin-bottom:14px}
+.winner{background:var(--gold);color:var(--on-gold);border-radius:var(--r);padding:18px;text-align:center;margin-bottom:14px}
 .winner .big{font-size:28px;font-weight:900}
 .winner .actions{display:flex;gap:8px;margin-top:12px}
-.winner .actions button{flex:1;background:#2a1e00;color:var(--gold);font-weight:700}
+.winner .actions button{flex:1;background:var(--on-gold);color:var(--gold);font-weight:700}
 
 /* Historial */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);background:var(--card)}
@@ -83,7 +83,7 @@ td:first-child,th:first-child{text-align:left;padding-left:10px;color:var(--mut)
 th:first-child{background:var(--card2)}
 td .pt{display:block;font-size:12px;color:var(--mut)}
 td .to{font-weight:700}
-td.out{color:#777}
+td.out{color:var(--mut);opacity:.6}
 td.cl .pt{color:var(--gold);font-weight:700}
 tr.rebuy td{background:rgba(90,169,230,.12);font-size:13px}
 tr.hand{cursor:pointer}
@@ -103,10 +103,10 @@ tr.hand:active td{background:var(--card2)}
 .hrow .top .n small{display:block;font-weight:400;color:var(--mut);font-size:12px}
 .hrow input[type=number]{width:84px;font-size:20px;font-weight:700;padding:8px}
 .closebtn{padding:8px 10px;font-size:13px;background:transparent;border:1px solid var(--line);white-space:nowrap}
-.closebtn.on{background:var(--gold);color:#2a1e00;border-color:var(--gold);font-weight:700}
+.closebtn.on{background:var(--gold);color:var(--on-gold);border-color:var(--gold);font-weight:700}
 .kinds{display:flex;gap:6px;margin-top:8px}
 .kinds button{flex:1;padding:8px 6px;font-size:13px;background:var(--bg);border:1px solid var(--line)}
-.kinds button.on{background:var(--gold);color:#2a1e00;font-weight:700;border-color:var(--gold)}
+.kinds button.on{background:var(--gold);color:var(--on-gold);font-weight:700;border-color:var(--gold)}
 .sheet .acts{display:flex;gap:10px;margin-top:14px}
 .sheet .acts button{flex:1;padding:14px}
 .err{color:var(--red);font-size:14px;margin-top:8px;min-height:1em}
@@ -118,12 +118,20 @@ tr.hand:active td{background:var(--card2)}
 .donate .dd{color:var(--mut);font-size:14px;margin:6px 0 12px}
 .donate button{width:100%;padding:14px;font-size:16px}
 .copy{text-align:center;color:var(--mut);font-size:12px;padding:8px 0 4px;opacity:.8}
+.themes{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:6px 0 4px}
+.th{padding:0;border-radius:14px;overflow:hidden;border:3px solid transparent;text-align:left;background:none}
+.th.on{border-color:var(--gold)}
+.th .pv{height:74px;padding:10px;display:flex;gap:6px;align-items:flex-end}
+.th .pv i{flex:1;height:38px;border-radius:8px;display:block}
+.th .pv b{width:26px;height:26px;border-radius:50%;display:block;flex:none}
+.th .tn{padding:8px 10px;font-weight:700;font-size:14px;display:flex;justify-content:space-between}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
 <body>
 <header>
   <h1 id="title">Chinchón<small id="subtitle">Marcador de puntos</small></h1>
+  <button class="icon" id="themeBtn" aria-label="Colores">🎨</button>
   <button class="icon" id="menuBtn" aria-label="Menú">⋮</button>
 </header>
 <main id="app"></main>
@@ -141,6 +149,36 @@ function openExternal(url) {
   const w = window.open(url, '_blank', 'noopener');
   if (!w) location.href = url;
 }
+/* ================= Temas de color ================= */
+const THEMES = {
+  tapete:   { name: 'Tapete',    bg:'#0b2a20', felt:'#0e3b2c', card:'#134a37', card2:'#1a5a43', line:'#2a6b52', txt:'#f3efe2', mut:'#a9c3b6', gold:'#e8b84a', onGold:'#2a1e00', red:'#e2574c', blue:'#5aa9e6', onBlue:'#06233a', ok:'#62c98a', outbg:'#2b2b2b' },
+  noche:    { name: 'Noche',     bg:'#0d1626', felt:'#13213a', card:'#1a2c4a', card2:'#23395e', line:'#2f4a75', txt:'#eef2f8', mut:'#9fb0c8', gold:'#f2b84b', onGold:'#2a1e00', red:'#ef6b5f', blue:'#6cc3ff', onBlue:'#06233a', ok:'#5fd39a', outbg:'#262a33' },
+  burdeos:  { name: 'Burdeos',   bg:'#22090e', felt:'#3a141b', card:'#4a1a23', card2:'#5c222d', line:'#7a2f3c', txt:'#f7ece4', mut:'#d0aeb0', gold:'#f0c060', onGold:'#2a1e00', red:'#ff7a6b', blue:'#7cc0f0', onBlue:'#06233a', ok:'#7ad69c', outbg:'#2e2a2b' },
+  morado:   { name: 'Morado',    bg:'#160d22', felt:'#24163a', card:'#2f1d4b', card2:'#3b265e', line:'#4f3779', txt:'#f3eefa', mut:'#b6a8cc', gold:'#ffb547', onGold:'#2a1600', red:'#ff6b81', blue:'#7fb8ff', onBlue:'#06233a', ok:'#6fe0a4', outbg:'#2a2730' },
+  grafito:  { name: 'Grafito',   bg:'#121212', felt:'#1c1c1e', card:'#26262a', card2:'#323238', line:'#46464c', txt:'#f2f2f2', mut:'#a8a8ad', gold:'#4fc3f7', onGold:'#00222f', red:'#ff6b6b', blue:'#9fa8ff', onBlue:'#0d1033', ok:'#69db7c', outbg:'#1a1a1a' },
+  claro:    { name: 'Claro',     bg:'#f1eee6', felt:'#ffffff', card:'#ffffff', card2:'#e8e3d6', line:'#d6cfbd', txt:'#1d2a24', mut:'#66716b', gold:'#1f7a55', onGold:'#ffffff', red:'#c0392b', blue:'#2a73c2', onBlue:'#ffffff', ok:'#2e9e62', outbg:'#e2ded3' },
+  contraste:{ name: 'Alto contraste', bg:'#000000', felt:'#000000', card:'#111111', card2:'#222222', line:'#777777', txt:'#ffffff', mut:'#dddddd', gold:'#ffdd00', onGold:'#000000', red:'#ff4d4d', blue:'#00c8ff', onBlue:'#000000', ok:'#00e676', outbg:'#1a1a1a' }
+};
+function applyTheme(key) {
+  const t = THEMES[key] || THEMES.tapete, r = document.documentElement.style;
+  const map = { bg:'--bg', felt:'--felt', card:'--card', card2:'--card2', line:'--line', txt:'--txt', mut:'--mut', gold:'--gold', onGold:'--on-gold', red:'--red', blue:'--blue', onBlue:'--on-blue', ok:'--ok', outbg:'--outbg' };
+  for (const k in map) r.setProperty(map[k], t[k]);
+  document.documentElement.style.colorScheme = key === 'claro' ? 'light' : 'dark';
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t.felt);
+}
+function openThemes() {
+  const cur = S.theme || 'tapete';
+  openModal(`<h3>🎨 Colores</h3><div class="sub">Toca un tema y se aplica al momento.</div>
+    <div class="themes">${Object.entries(THEMES).map(([k, t]) => `
+      <button class="th ${k === cur ? 'on' : ''}" data-theme="${k}" style="background:${t.card}">
+        <div class="pv" style="background:${t.bg}"><i style="background:${t.card}"></i><i style="background:${t.card2}"></i><b style="background:${t.gold}"></b></div>
+        <div class="tn" style="color:${t.txt}">${esc(t.name)}<span style="color:${t.gold}">${k === cur ? '✓' : ''}</span></div>
+      </button>`).join('')}</div>
+    <div class="acts"><button class="btn-gold" id="thOk">Listo</button></div>`);
+  document.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { S.theme = b.dataset.theme; applyTheme(S.theme); save(); openThemes(); });
+  $('#thOk').onclick = closeModal;
+}
+
 const DEF_CFG = {
   limit: 100,          // eliminado al pasar de este total
   closeBonus: -10,     // puntos al cerrar con todo ligado
@@ -551,6 +589,7 @@ $('#menuBtn').onclick = () => {
   if (!g) {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
+      <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de · ☕ Donar</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   } else {
@@ -560,15 +599,17 @@ $('#menuBtn').onclick = () => {
       <button id="mPlayers">✏️ Cambiar nombres</button>
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
+      <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de · ☕ Donar</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   }
   const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
+  on('mTheme', openThemes);
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
-      <div class="sub">v1.0.2<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="sub">v1.0.3<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
       <div class="donate">
         <div class="dt">☕ ¿Te gusta esta app?</div>
         <div class="dd">Es gratis y sin anuncios. Si te resulta útil, puedes invitar al desarrollador con 1&nbsp;€.</div>
@@ -610,6 +651,8 @@ $('#menuBtn').onclick = () => {
 };
 
 /* ================= Arranque ================= */
+applyTheme(S.theme);
+$('#themeBtn').onclick = openThemes;
 render();
 if (S.game) keepAwake();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
