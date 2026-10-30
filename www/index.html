@@ -346,7 +346,7 @@ function renderSetup() {
       <button class="btn-ghost" id="addP" style="width:100%" ${d.names.length >= 10 ? 'disabled' : ''}>+ Añadir jugador</button>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
-    ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml()}</div>` : ''}
+    ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml(3)}${S.archive.length > 3 ? '<button class="btn-ghost" id="allArch" style="width:100%;margin-top:4px">Ver todas y victorias</button>' : ''}</div>` : ''}
     <div class="copy">© 2026 IT Canarias</div>
     <button class="btn-gold fab" id="start">Empezar partida</button>`;
   bindCfg('s_');
@@ -377,10 +377,11 @@ function renderSetup() {
     render();
   };
   document.querySelectorAll('[data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
+  const allA = $('#allArch'); if (allA) allA.onclick = openArchive;
 }
 
-function archiveHtml() {
-  return S.archive.slice(0, 15).map((a, i) => {
+function archiveHtml(max) {
+  return S.archive.slice(0, max || 5).map((a, i) => {
     const dt = new Date(a.finished || a.created);
     return `<div class="hrow" data-arch="${i}" style="cursor:pointer"><div class="top"><div class="n">🏆 ${esc(a.winnerName)}<small>${dt.toLocaleDateString('es-ES')} ${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${a.hands} manos · ${a.players.map(p => esc(p.name)).join(', ')}</small></div></div></div>`;
   }).join('');
@@ -390,9 +391,33 @@ function showArchived(i) {
   const R = compute(a);
   openModal(`<h3>🏆 ${esc(a.winnerName)}</h3><div class="sub">${a.hands} manos · ${new Date(a.finished || a.created).toLocaleString('es-ES')}</div>
     ${historyTable(a, R, false)}
-    <div class="acts"><button class="btn-red" id="arDel">Borrar</button><button class="btn-gold" id="arClose">Cerrar</button></div>`);
-  $('#arClose').onclick = closeModal;
-  $('#arDel').onclick = () => { S.archive.splice(i, 1); closeModal(); render(); };
+    ${finalScores(a, R)}
+    <div class="acts"><button class="btn-red" id="arDel">Borrar</button><button class="btn-gold" id="arClose">‹ Volver</button></div>`);
+  $('#arClose').onclick = openArchive;
+  $('#arDel').onclick = () => confirmBox('Borrar partida', 'Se quitará del historial.', 'Borrar', () => { S.archive.splice(i, 1); save(); render(); openArchive(); }, true);
+}
+function finalScores(g, R) {
+  return '<div class="hrow" style="margin-top:10px">' + g.players.slice()
+    .sort((a, b) => (R.st[a.id].out - R.st[b.id].out) || (R.st[a.id].total - R.st[b.id].total))
+    .map(p => { const st = R.st[p.id]; return `<div class="top" style="padding:4px 0"><div class="n">${R.ended && R.ended.winner === p.id ? '🏆 ' : ''}${esc(p.name)}${st.rebuys ? ' <small style="display:inline">↻' + st.rebuys + '</small>' : ''}</div><b style="${st.out ? 'color:var(--red)' : ''}">${st.total}</b></div>`; }).join('') + '</div>';
+}
+function openArchive() {
+  if (!S.archive.length) {
+    openModal(`<h3>📜 Partidas anteriores</h3><div class="empty">Aún no hay partidas guardadas.<br>Se guardan al pulsar «Revancha», «Nueva partida» o «Terminar partida».</div><div class="acts"><button class="btn-gold" id="aC">Cerrar</button></div>`);
+    $('#aC').onclick = closeModal; return;
+  }
+  const wins = {}, played = {};
+  S.archive.forEach(a => {
+    a.players.forEach(p => { const k = p.name.trim(); played[k] = (played[k] || 0) + 1; });
+    if (a.winnerName && a.winnerName !== '(sin terminar)') wins[a.winnerName] = (wins[a.winnerName] || 0) + 1;
+  });
+  const rank = Object.keys(played).sort((a, b) => (wins[b] || 0) - (wins[a] || 0) || played[b] - played[a]);
+  openModal(`<h3>📜 Partidas anteriores</h3><div class="sub">${S.archive.length} partida${S.archive.length === 1 ? '' : 's'} guardada${S.archive.length === 1 ? '' : 's'}. Toca una para ver el detalle.</div>
+    <div class="sec" style="margin-bottom:10px"><h2>Victorias</h2>${rank.map((n, i) => `<div class="top" style="display:flex;justify-content:space-between;padding:5px 0;border-top:${i ? '1px solid var(--line)' : '0'}"><span>${i === 0 && wins[n] ? '🥇 ' : i === 1 && wins[n] ? '🥈 ' : i === 2 && wins[n] ? '🥉 ' : ''}${esc(n)}</span><span><b style="color:var(--gold)">${wins[n] || 0}</b> <span class="mut">de ${played[n]}</span></span></div>`).join('')}</div>
+    ${archiveHtml(S.archive.length)}
+    <div class="acts"><button class="btn-gold" id="aC">Cerrar</button></div>`);
+  $('#aC').onclick = closeModal;
+  document.querySelectorAll('#modal [data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
 }
 
 /* ---------- Partida en curso ---------- */
@@ -589,6 +614,7 @@ $('#menuBtn').onclick = () => {
   if (!g) {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
+      <button id="mArch">📜 Partidas anteriores</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -599,6 +625,7 @@ $('#menuBtn').onclick = () => {
       <button id="mPlayers">✏️ Cambiar nombres</button>
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
+      <button id="mArch">📜 Partidas anteriores</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -607,9 +634,10 @@ $('#menuBtn').onclick = () => {
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
   on('mTheme', openThemes);
+  on('mArch', openArchive);
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
-      <div class="sub">v1.0.6<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="sub">v1.0.7<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
       <div class="donate">
         <div class="dt">💛 Apoya el desarrollo de esta app</div>
         <div class="dd">Es gratis y sin anuncios. Con 1&nbsp;€ nos ayudas a seguir mejorándola y a crear nuevas apps como esta. ¡Gracias!</div>
