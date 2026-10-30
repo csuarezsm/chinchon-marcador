@@ -31,8 +31,13 @@ jobs:
         env: { ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" }
         run: chmod +x gradlew && ./gradlew assembleDebug
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk chinchon.apk
-      - name: Publicar APK como descarga directa
+      - name: Publicar versión
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest chinchon.apk --title "Chinchón (última versión)" --notes "Chinchón · Marcador — © 2026 IT Canarias"
+          V=$(grep -oP 'versionName "\K[^"]+' android/app/build.gradle)
+          grep -q "APP_VERSION = '$V'" www/index.html || { echo "::error::APP_VERSION en www/index.html no coincide con versionName $V"; exit 1; }
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release delete "v$V" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v$V" chinchon.apk --latest --title "Chinchón v$V" --notes "$(git log -1 --pretty=%s)
+
+          © 2026 IT Canarias"

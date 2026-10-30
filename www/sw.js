@@ -1,5 +1,5 @@
 // Service worker: deja la app disponible sin conexión
-const CACHE = 'chinchon-v1.1.0';
+const CACHE = 'chinchon-v1.1.1';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
@@ -10,6 +10,8 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Solo los archivos de la propia app: lo demás (GitHub, PayPal…) va siempre a internet
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => hit || fetch(e.request).then(res => {
       const copy = res.clone();

@@ -178,6 +178,8 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
+const APP_VERSION = '1.1.1';
+const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
   limit: 100,          // eliminado al pasar de este total
@@ -401,6 +403,58 @@ function finalScores(g, R) {
     .sort((a, b) => (R.st[a.id].out - R.st[b.id].out) || (R.st[a.id].total - R.st[b.id].total))
     .map(p => { const st = R.st[p.id]; return `<div class="top" style="padding:4px 0"><div class="n">${R.ended && R.ended.winner === p.id ? '🏆 ' : ''}${esc(p.name)}${st.rebuys ? ' <small style="display:inline">↻' + st.rebuys + '</small>' : ''}</div><b style="${st.out ? 'color:var(--red)' : ''}">${st.total}</b></div>`; }).join('') + '</div>';
 }
+/* ---------- Actualizaciones ---------- */
+function cmpVer(a, b) { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; }
+async function checkUpdates(manual) {
+  if (manual) openModal('<h3>🔄 Buscando actualizaciones…</h3><div class="sub">Un momento.</div>');
+  try {
+    const r = await fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const v = String(j.tag_name || '').replace(/^v/, '');
+    const apk = (j.assets || []).find(a => /\.apk$/i.test(a.name));
+    S.lastUpdateCheck = Date.now(); save();
+    if (!/^\d+\.\d+\.\d+$/.test(v) || !apk) { if (manual) showUpdMsg('No hay ninguna versión publicada todavía.'); return; }
+    if (cmpVer(v, APP_VERSION) > 0) showUpdate(v, apk.browser_download_url, j.html_url, (j.body || '').split('\n')[0]);
+    else if (manual) showUpdMsg(`Tienes la última versión (v${APP_VERSION}).`, '✅');
+  } catch (e) {
+    if (manual) showUpdMsg('No se pudo comprobar. Revisa que tengas conexión a internet.', '⚠️');
+  }
+}
+function showUpdMsg(t, icon) { openModal(`<h3>${icon || 'ℹ️'} Actualizaciones</h3><div class="sub">${esc(t)}</div><div class="acts"><button class="btn-gold" id="uOk">Vale</button></div>`); $('#uOk').onclick = closeModal; }
+function showUpdate(v, url, page, note) {
+  openModal(`<h3>🎉 Nueva versión disponible</h3>
+    <div class="sub">Tienes la v${APP_VERSION} y ya está la <b>v${esc(v)}</b>.${note ? '<br>' + esc(note.replace(/^v[\d.]+:\s*/, 'Novedades: ')) : ''}<br><br>Tus partidas, el historial y los colores se conservan.</div>
+    <div id="uProg" class="mut" style="min-height:1.2em"></div>
+    <div class="acts"><button class="btn-ghost" id="uLater">Más tarde</button><button class="btn-gold" id="uGo">Actualizar ahora</button></div>`);
+  $('#uLater').onclick = closeModal;
+  $('#uGo').onclick = () => installUpdate(url, page);
+}
+async function installUpdate(url, page) {
+  const U = isNative() && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater;
+  if (!U) { openExternal(page || ('https://github.com/' + REPO + '/releases/latest')); return; }
+  const prog = $('#uProg'), go = $('#uGo');
+  try {
+    const { allowed } = await U.canInstall();
+    if (!allowed) {
+      openModal(`<h3>Un permiso, solo la primera vez</h3><div class="sub">Android necesita que permitas a Chinchón instalar su actualización.<br><br>Pulsa <b>Abrir ajustes</b>, activa <b>«Permitir de esta fuente»</b>, vuelve atrás y pulsa otra vez <b>Actualizar</b>.</div>
+        <div class="acts"><button class="btn-ghost" id="pNo">Cancelar</button><button class="btn-gold" id="pSet">Abrir ajustes</button></div>`);
+      $('#pNo').onclick = closeModal;
+      $('#pSet').onclick = async () => { closeModal(); try { await U.openInstallSettings(); } catch (e) { toast('Ábrelo en Ajustes → Aplicaciones → Chinchón'); } };
+      return;
+    }
+    go.disabled = true; go.textContent = 'Descargando…'; prog.textContent = 'Descargando 0%';
+    const h = await U.addListener('progress', d => { prog.textContent = 'Descargando ' + d.pct + '%'; });
+    await U.downloadAndInstall({ url });
+    try { h.remove(); } catch (e) {}
+    prog.textContent = 'Descarga completa. Pulsa «Actualizar» en la ventana de Android.';
+    go.textContent = 'Actualizar ahora'; go.disabled = false;
+  } catch (e) {
+    prog.textContent = String(e && e.message || e);
+    go.textContent = 'Reintentar'; go.disabled = false;
+  }
+}
+
 /* ---------- Copia de seguridad ---------- */
 const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 async function exportBackup() {
@@ -737,6 +791,7 @@ $('#menuBtn').onclick = () => {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
       <button id="mArch">📊 Clasificación y partidas</button>
+      <button id="mUpd">🔄 Buscar actualizaciones</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -748,6 +803,7 @@ $('#menuBtn').onclick = () => {
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
       <button id="mArch">📊 Clasificación y partidas</button>
+      <button id="mUpd">🔄 Buscar actualizaciones</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -756,10 +812,11 @@ $('#menuBtn').onclick = () => {
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
   on('mTheme', openThemes);
+  on('mUpd', () => checkUpdates(true));
   on('mArch', () => openArchive('ranking'));
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
-      <div class="sub">v1.1.0<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="sub">v${APP_VERSION}<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
       <div class="donate">
         <div class="dt">💛 Apoya el desarrollo de esta app</div>
         <div class="dd">Es gratis y sin anuncios. Con 1&nbsp;€ nos ayudas a seguir mejorándola y a crear nuevas apps como esta. ¡Gracias!</div>
@@ -802,6 +859,7 @@ $('#menuBtn').onclick = () => {
 
 /* ================= Arranque ================= */
 applyTheme(S.theme);
+setTimeout(() => { if (isNative() && (!S.lastUpdateCheck || Date.now() - S.lastUpdateCheck > 20 * 3600e3)) checkUpdates(false); }, 2500);
 render();
 if (S.game) keepAwake();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
