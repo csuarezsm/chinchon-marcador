@@ -1,0 +1,168 @@
+// Pruebas automáticas de Chinchón · Marcador
+// Se ejecutan en GitHub antes de compilar: si alguna falla, no se publica la versión.
+// Uso local: node tests/app.test.mjs
+import { chromium } from 'playwright';
+import http from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('../www/', import.meta.url));
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+const server = http.createServer(async (req, res) => {
+  const path = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
+  try { const f = await readFile(join(ROOT, path === '/' ? 'index.html' : path)); res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'text/html' }); res.end(f); }
+  catch { res.writeHead(404); res.end(); }
+});
+await new Promise(r => server.listen(0, r));
+const URL_APP = `http://localhost:${server.address().port}/`;
+
+let passed = 0, failed = 0;
+const check = (name, cond, extra = '') => { if (cond) { passed++; console.log('  ✓ ' + name); } else { failed++; console.log('  ✗ ' + name + (extra ? ' → ' + extra : '')); } };
+
+const browser = await chromium.launch();
+async function fresh(state) {
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, isMobile: true, hasTouch: true, serviceWorkers: 'block', acceptDownloads: true });
+  await ctx.route('https://api.github.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ tag_name: 'v0.0.1', assets: [] }) }));
+  const p = await ctx.newPage();
+  const errors = [];
+  p.on('pageerror', e => errors.push(e.message));
+  await p.addInitScript(st => { if (st && !sessionStorage.getItem('seeded')) { localStorage.setItem('chinchon.v1', JSON.stringify(st)); sessionStorage.setItem('seeded', '1'); } }, state || { onboarded: true });
+  await p.goto(URL_APP);
+  return { p, ctx, errors };
+}
+const totals = p => p.evaluate(() => { const R = compute(S.game); return Object.fromEntries(S.game.players.map(x => [x.name, R.st[x.id].total])); });
+const keys = async (p, s) => { for (const ch of s) await p.click(`[data-k="${ch}"]`); };
+async function startGame(p, names, dealer = 0) {
+  for (const [i, n] of names.entries()) { if (!(await p.$(`[data-name="${i}"]`))) await p.click('#addP'); await p.fill(`[data-name="${i}"]`, n); }
+  if (dealer) await p.click(`[data-deal="${dealer}"]`);
+  await p.click('#start');
+}
+async function hand(p, pts, closer, kind) {
+  await p.click('#addHand');
+  if (closer) { await p.click(`[data-close="${await p.evaluate(n => S.game.players.find(x => x.name === n).id, closer)}"]`); if (kind) await p.click(`[data-kind="${kind}"]`); }
+  for (const [name, v] of Object.entries(pts)) {
+    const id = await p.evaluate(n => S.game.players.find(x => x.name === n).id, name);
+    await p.click(`[data-sc="${id}"]`);
+    await keys(p, String(v));
+  }
+  await p.click('#hSave');
+  await p.waitForTimeout(50);
+}
+
+console.log('Puntuación, eliminación, reparto y reenganche');
+{
+  const { p, ctx, errors } = await fresh();
+  await startGame(p, ['Carlos', 'Ana', 'Pepe', 'Lola'], 1);
+  await hand(p, { Carlos: 12, Ana: 3, Pepe: 40, Lola: 25 }, 'Ana');
+  await hand(p, { Ana: 8, Pepe: 50, Lola: 20 }, 'Carlos', 'bonus');
+  await hand(p, { Carlos: 20, Ana: 45, Pepe: 15 }, 'Lola', 'bonus');
+  const t = await totals(p);
+  check('totales correctos', t.Carlos === 22 && t.Ana === 56 && t.Pepe === 105 && t.Lola === 35, JSON.stringify(t));
+  const st = await p.evaluate(() => { const R = compute(S.game); return { out: S.game.players.filter(x => R.st[x.id].out).map(x => x.name), next: S.game.players.find(x => x.id === R.next).name }; });
+  check('Pepe eliminado al pasar de 100', st.out.join() === 'Pepe', st.out.join());
+  check('el reparto pasa al siguiente (Ana → Pepe → Lola → Carlos)', st.next === 'Carlos', st.next);
+  const pepe = await p.evaluate(() => S.game.players.find(x => x.name === 'Pepe').id);
+  await p.click(`[data-rebuy="${pepe}"]`); await p.click('#cOk');
+  check('reenganche con los puntos del que más tiene', (await totals(p)).Pepe === 56);
+  check('no se puede reenganchar dos veces (límite 1)', await p.evaluate(id => { S.game.events.push({ t: 'hand', dealer: S.game.players[0].id, closer: null, kind: 'normal', scores: Object.fromEntries(S.game.players.map(x => [x.id, x.id === id ? 60 : 0])) }); const R = compute(S.game); const r = canRebuy(S.game, R, id); S.game.events.pop(); return !r; }, pepe));
+  await hand(p, { Ana: 60, Pepe: 10, Lola: 50 }, 'Carlos', 'chinchon');
+  check('chinchón gana la partida', await p.evaluate(() => { const R = compute(S.game); return R.ended && R.ended.by === 'chinchon' && pname(S.game, R.ended.winner) === 'Carlos'; }));
+  check('sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('Teclado, deshacer y corrección');
+{
+  const { p, ctx, errors } = await fresh();
+  await startGame(p, ['A', 'B', 'C']);
+  await p.click('#addHand'); await keys(p, '12'); await p.click('#kNext'); await keys(p, '7'); await p.click('#kNext'); await keys(p, '459'); await p.click('[data-k="del"]');
+  check('máximo 3 cifras y borrar', (await p.$$eval('[data-sc]', e => e.map(x => x.textContent))).join() === '12,7,45');
+  await p.click('#hSave'); await p.waitForTimeout(50);
+  check('aparece «Deshacer»', await p.$eval('#undoBar', b => b.classList.contains('on')));
+  await p.click('#undoBtn');
+  check('deshacer quita la mano', await p.evaluate(() => S.game.events.length === 0));
+  await p.click('#addHand'); await keys(p, '5'); await p.click('#hSave');
+  check('avisa si falta una puntuación', /Falta/.test(await p.textContent('#hErr')));
+  await p.click('#hCancel');
+  await hand(p, { A: 10, B: 20, C: 30 });
+  await p.click('tr.hand'); const cId = await p.evaluate(() => S.game.players[2].id);
+  await p.click(`[data-sc="${cId}"]`); await p.click('[data-k="del"]'); await p.click('[data-k="del"]'); await keys(p, '31'); await p.click('#hSave');
+  check('corregir una mano recalcula', (await totals(p)).C === 31);
+  check('sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+// genera un historial de ejemplo determinista
+const seedArchive = () => {
+  const names = ['Carlos', 'Tere', 'Aitor', 'Lola']; let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const mk = (ts, players) => { const ps = players.map(n => ({ id: uid(), name: n })); const g = { id: uid(), created: ts, cfg: Object.assign({}, DEF_CFG), players: ps, firstDealer: ps[0].id, events: [] };
+    let guard = 0; while (!compute(g).ended && guard++ < 80) { const R = compute(g); const act = R.active; const closer = act[Math.floor(rnd() * act.length)].id; const sc = {}; act.forEach(p => sc[p.id] = p.id === closer ? Math.floor(rnd() * 5) : Math.floor(rnd() * 45)); g.events.push({ t: 'hand', dealer: R.next, closer, kind: 'normal', scores: sc }); }
+    const R = compute(g); return { ...g, finished: ts, hands: R.hand, winnerName: pname(g, R.ended.winner) }; };
+  const base = new Date(2026, 8, 1, 21).getTime();
+  for (let d = 0; d < 30; d += 3) for (let i = 0; i < 4; i++) S.archive.unshift(mk(base + d * 864e5 + i * 40 * 60e3, names));
+  S.archive.unshift(mk(base + 31 * 864e5, ['Carlos', 'Pepe']));
+  save(); render();
+};
+
+console.log('Clasificación, ficha, récords y jugadores');
+{
+  const { p, ctx, errors } = await fresh();
+  await p.evaluate(seedArchive);
+  const rank = await p.evaluate(() => aggregate(S.archive.map(gameResult).filter(Boolean)).sort((a, b) => b.rating - a.rating).map(o => [o.name, o.pj]));
+  check('ranking con todos los jugadores', rank.length === 5, JSON.stringify(rank));
+  check('quien juega 1 partida no lidera', rank[0][0] !== 'Pepe');
+  check('jornadas agrupadas (de 6:00 a 6:00)', await p.evaluate(() => new Set(S.archive.map(a => jornadaKey(a.finished))).size === 11));
+  await p.click('#menuBtn'); await p.click('#mArch');
+  await p.click('#modal [data-player="Tere"]');
+  check('ficha del jugador', /Cara a cara/.test(await p.textContent('#modal')));
+  await p.click('#pfBack'); await p.click('#modal [data-tab="records"]');
+  check('récords', (await p.$$('#modal .hrow')).length >= 6);
+  await p.click('#modal [data-tab="jornadas"]'); await p.click('#modal [data-tab="partidas"]'); await p.click('#aC');
+  await p.evaluate(() => { S.archive[0].players[0].name = 'carlos '; S.roster = ['Carlos', 'Tere', 'Aitor', 'Lola', 'Teresa']; S.archive[1].players.find(x => x.name === 'Tere').name = 'Teresa'; save(); render(); });
+  await p.click('#manageRoster'); await p.fill('[data-orig="Teresa"]', 'Tere'); await p.click('#roS'); await p.click('#cOk');
+  check('unir «Teresa» con «Tere»', await p.evaluate(() => !S.archive.some(a => a.players.some(x => x.name === 'Teresa')) && !S.roster.includes('Teresa')));
+  check('nombres con mayúsculas o espacios cuentan como el mismo jugador', await p.evaluate(() => aggregate(S.archive.map(gameResult).filter(Boolean)).filter(o => nkey(o.name) === 'carlos').length === 1));
+  check('sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('Copias, grupo y borrar datos');
+{
+  const { p, ctx, errors } = await fresh();
+  await p.evaluate(seedArchive);
+  const json = await p.evaluate(() => backupJSON());
+  const { p: p2, ctx: ctx2, errors: e2 } = await fresh();
+  const n1 = await p2.evaluate(j => { const n = mergeBackup(JSON.parse(j)); save(); return n; }, json);
+  const n2 = await p2.evaluate(j => mergeBackup(JSON.parse(j)), json);
+  check('recibir partidas del grupo', n1 === 41, String(n1));
+  check('recibir dos veces no duplica', n2 === 0 && (await p2.evaluate(() => S.archive.length)) === 41);
+  check('se recuperan los jugadores habituales', await p2.evaluate(() => S.roster.includes('Tere')));
+  check('rechaza archivos que no son copias', await p2.evaluate(() => !validBackup({ foo: 1 })));
+  await p2.click('#menuBtn'); await p2.click('#mWipe'); await p2.click('#wHist'); await p2.click('#cOk');
+  check('borrar solo el historial', await p2.evaluate(() => S.archive.length === 0 && S.roster.length > 0));
+  await p2.click('#menuBtn'); await p2.click('#mWipe'); await p2.click('#wAll'); await p2.click('#cOk'); await p2.click('#cOk');
+  await p2.waitForLoadState('load'); await p2.waitForTimeout(200);
+  check('borrar todo deja la app como nueva', await p2.evaluate(() => !S.archive.length && !S.game && !S.roster.length));
+  check('sin errores de JavaScript', !errors.length && !e2.length, errors.concat(e2).join(' | '));
+  await ctx.close(); await ctx2.close();
+}
+
+console.log('Bienvenida, actualizaciones y tamaño de letra');
+{
+  const { p, ctx, errors } = await fresh({});
+  await p.waitForTimeout(600);
+  check('bienvenida la primera vez', /Bienvenido/.test(await p.textContent('#modal')));
+  for (let i = 0; i < 5; i++) await p.click('#wbNext');
+  await p.click('#wbNext');
+  check('la bienvenida no vuelve a salir', await p.evaluate(() => S.onboarded === true));
+  check('comparar versiones', await p.evaluate(() => cmpVer('1.10.0', '1.9.9') > 0 && cmpVer('2.0.0', '2.0.0') === 0 && cmpVer('1.4.2', '1.5.0') < 0));
+  await p.evaluate(() => { S.fontScale = '1.3'; applyFont(); render(); });
+  check('con letra muy grande no se sale de la pantalla', await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  check('sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
+await browser.close(); server.close();
+console.log(`\n${passed} correctas, ${failed} fallidas`);
+process.exit(failed ? 1 : 0);

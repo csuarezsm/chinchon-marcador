@@ -133,6 +133,7 @@ tr.hand:active td{background:var(--card2)}
 #toast.on{opacity:1}
 .menu button{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--card)}
 .menu button.btn-gold{background:var(--gold);color:var(--on-gold)}
+.menu button.btn-red{background:var(--red);color:#fff}
 .donate{background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:14px;margin-top:4px;text-align:center}
 .donate .dt{font-weight:800;font-size:calc(17px * var(--fs, 1));color:var(--gold)}
 .donate .dd{color:var(--mut);font-size:calc(14px * var(--fs, 1));margin:6px 0 12px}
@@ -235,7 +236,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '2.0.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -529,7 +530,7 @@ function openRoster() {
 function archiveHtml(max) {
   return S.archive.slice(0, max || 5).map((a, i) => {
     const dt = new Date(a.finished || a.created);
-    return `<div class="hrow" data-arch="${i}" style="cursor:pointer"><div class="top"><div class="n">🏆 ${esc(a.winnerName)}<small>${dt.toLocaleDateString('es-ES')} ${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${a.hands} manos · ${a.players.map(p => esc(p.name)).join(', ')}</small></div></div></div>`;
+    return `<div class="hrow" data-arch="${i}" style="cursor:pointer"><div class="top"><div class="n">🏆 ${esc(a.winnerName)}<small>${dt.toLocaleDateString('es-ES')} ${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${a.hands} mano${a.hands === 1 ? '' : 's'} · ${a.players.map(p => esc(p.name)).join(', ')}</small></div></div></div>`;
   }).join('');
 }
 function showArchived(i) {
@@ -677,6 +678,54 @@ async function shareImage(dataUrl, fileName, text) {
   }
 }
 
+/* ---------- Borrar datos ---------- */
+function openWipe() {
+  openModal(`<h3>🗑 Borrar datos</h3><div class="sub">Elige qué quieres borrar. No se puede deshacer, así que antes puedes guardar una copia.</div>
+    <div class="menu">
+      ${S.archive.length ? '<button id="wCopy">💾 Guardar una copia antes</button>' : ''}
+      <button id="wHist">Solo el historial de partidas<br><small class="mut">Se mantienen jugadores, colores y la partida en curso</small></button>
+      <button id="wAll" class="btn-red">Todo: dejar la app como nueva<br><small>Partidas, jugadores, reglas, colores y copias automáticas</small></button>
+    </div>
+    <div class="acts"><button class="btn-ghost" id="wNo">Cancelar</button></div>`);
+  $('#wNo').onclick = closeModal;
+  const cp = $('#wCopy'); if (cp) cp.onclick = () => exportBackup(false);
+  $('#wHist').onclick = () => confirmBox('Borrar historial', `Se borrarán las ${S.archive.length} partidas guardadas, el ranking y los récords.`, 'Borrar historial', () => { S.archive = []; save(); render(); toast('Historial borrado'); autoBackup(true); }, true);
+  $('#wAll').onclick = () => confirmBox('Borrar TODO', 'La app quedará como recién instalada. ¿Seguro?', 'Sí, borrar todo', () => confirmBox('Última confirmación', 'Se perderán todas las partidas y ajustes de este móvil.', 'Borrar definitivamente', wipeAll, true), true);
+}
+async function wipeAll() {
+  if (isNative()) {
+    const { Filesystem } = window.Capacitor.Plugins;
+    for (const [path, directory] of [[AUTO_FILE, 'DATA'], ['Chinchon/' + AUTO_FILE, 'DOCUMENTS']]) { try { await Filesystem.deleteFile({ path, directory }); } catch (e) {} }
+  }
+  try { localStorage.removeItem(KEY); localStorage.setItem(KEY, JSON.stringify({ restoreOffered: true, onboarded: true })); } catch (e) {}
+  location.reload();
+}
+
+/* ---------- Pantalla de bienvenida ---------- */
+const WELCOME = [
+  ['🃏', 'Bienvenido a Chinchón', 'Lleva los puntos de tus partidas sin papel ni bolígrafo: manos, totales, eliminados y reenganches.'],
+  ['👥', 'Prepara la mesa', 'Añade a los jugadores en el orden en que estáis sentados y toca el círculo de quien da primero. Los habituales se añaden con un toque.'],
+  ['✍️', 'Anota cada mano', 'Pulsa «Anotar mano», escribe los puntos con el teclado y marca quién cerró: normal, todo ligado o chinchón. Si te equivocas, «Deshacer» o toca la mano para corregirla.'],
+  ['↻', 'Eliminados y reenganches', 'Quien pasa del límite queda eliminado. Si las reglas lo permiten, aparece el botón «Reenganchar» con los puntos con los que vuelve.'],
+  ['📊', 'Ranking, jornadas y récords', 'En ⋮ → Clasificación verás quién va mejor, el resultado de cada día y los récords. Toca un jugador para ver su ficha y compártelo todo por WhatsApp.'],
+  ['👥', 'Jugad en grupo', 'Para que todos tengáis los mismos datos, enviad las partidas al grupo desde Clasificación → Partidas. Al recibirlas no se duplica nada.']
+];
+function openWelcome(i) {
+  i = Math.max(0, Math.min(WELCOME.length - 1, i || 0));
+  const [ic, t, d] = WELCOME[i], last = i === WELCOME.length - 1;
+  openModal(`<div style="text-align:center;padding:10px 4px 0">
+      <div style="font-size:calc(64px * var(--fs, 1));line-height:1.2">${ic}</div>
+      <h3 style="margin:10px 0 8px;font-size:calc(22px * var(--fs, 1))">${esc(t)}</h3>
+      <div class="mut" style="font-size:calc(16px * var(--fs, 1));line-height:1.5;min-height:6em">${esc(d)}</div>
+      <div style="display:flex;justify-content:center;gap:6px;margin:14px 0 4px">${WELCOME.map((_, k) => `<i style="width:${k === i ? 20 : 8}px;height:8px;border-radius:4px;background:${k === i ? 'var(--gold)' : 'var(--line)'};display:block"></i>`).join('')}</div>
+    </div>
+    <div class="acts">${i ? '<button class="btn-ghost" id="wbPrev">‹ Atrás</button>' : '<button class="btn-ghost" id="wbSkip">Saltar</button>'}<button class="btn-gold" id="wbNext">${last ? '¡A jugar!' : 'Siguiente ›'}</button></div>`);
+  const done = () => { S.onboarded = true; save(); closeModal(); };
+  const sk = $('#wbSkip'); if (sk) sk.onclick = done;
+  const pv = $('#wbPrev'); if (pv) pv.onclick = () => openWelcome(i - 1);
+  $('#wbNext').onclick = () => last ? done() : openWelcome(i + 1);
+}
+
 /* ---------- Compartir la app ---------- */
 const APK_URL = 'https://github.com/' + REPO + '/releases/latest/download/chinchon.apk';
 async function shareApp() {
@@ -692,15 +741,68 @@ async function shareApp() {
 
 /* ---------- Copia de seguridad ---------- */
 const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-async function exportBackup() {
+function backupJSON() {
+  return JSON.stringify({ app: 'chinchon-marcador', format: 1, version: APP_VERSION, exported: new Date().toISOString(), archive: S.archive, game: S.game, roster: S.roster, theme: S.theme, fontScale: S.fontScale, lastNames: S.lastNames, lastCfg: S.lastCfg });
+}
+function validBackup(b) { return b && b.app === 'chinchon-marcador' && Array.isArray(b.archive); }
+// Añade lo que trae la copia sin duplicar ni borrar nada de lo que ya hay
+function mergeBackup(b) {
+  const have = new Set(S.archive.map(a => a.id));
+  const nuevas = b.archive.filter(a => a && a.id && Array.isArray(a.players) && Array.isArray(a.events) && !have.has(a.id));
+  S.archive = S.archive.concat(nuevas).sort((x, y) => (y.finished || y.created || 0) - (x.finished || x.created || 0)).slice(0, MAX_ARCHIVE);
+  if (!S.game && b.game && Array.isArray(b.game.players)) S.game = b.game;
+  (b.roster || []).forEach(n => { if (n && !S.roster.some(x => nkey(x) === nkey(n))) S.roster.push(n); });
+  S.archive.forEach(a => a.players.forEach(p => { if (!/^Jugador \d+$/.test(p.name) && !S.roster.some(x => nkey(x) === nkey(p.name))) S.roster.push(p.name); }));
+  if (!S.theme && b.theme) { S.theme = b.theme; applyTheme(S.theme); }
+  if (!S.fontScale && b.fontScale) { S.fontScale = b.fontScale; applyFont(); }
+  return nuevas.length;
+}
+
+/* Copia automática (solo app Android):
+   - en la memoria interna de la app: Android la incluye en su copia de seguridad de Google y la devuelve al reinstalar o cambiar de móvil;
+   - en Documentos/Chinchon del móvil, si Android lo permite. */
+const AUTO_FILE = 'chinchon-copia-auto.json';
+let autoBackupBusy = false;
+async function autoBackup(force) {
+  if (!isNative() || autoBackupBusy) return;
+  if (!S.archive.length && !S.game) return;
+  if (!force && S.lastAutoBackup && Date.now() - S.lastAutoBackup < 3600e3) return;
+  autoBackupBusy = true;
+  try {
+    const { Filesystem } = window.Capacitor.Plugins, data = backupJSON();
+    await Filesystem.writeFile({ path: AUTO_FILE, data, directory: 'DATA', encoding: 'utf8' });
+    try { await Filesystem.writeFile({ path: 'Chinchon/' + AUTO_FILE, data, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true }); S.autoBackupDocs = true; }
+    catch (e) { S.autoBackupDocs = false; }
+    S.lastAutoBackup = Date.now(); save();
+  } catch (e) { /* sin copia esta vez; se reintenta más tarde */ }
+  autoBackupBusy = false;
+}
+// Tras reinstalar: si la app está vacía y hay una copia, ofrecer recuperarla
+async function offerRestore() {
+  if (!isNative() || S.archive.length || S.game || S.restoreOffered) return;
+  const { Filesystem } = window.Capacitor.Plugins;
+  let b = null;
+  for (const [path, directory] of [[AUTO_FILE, 'DATA'], ['Chinchon/' + AUTO_FILE, 'DOCUMENTS']]) {
+    try { const r = await Filesystem.readFile({ path, directory, encoding: 'utf8' }); const j = JSON.parse(r.data); if (validBackup(j) && (j.archive.length || j.game)) { b = j; break; } } catch (e) {}
+  }
+  S.restoreOffered = true; save();
+  if (!b) return;
+  const when = new Date(b.exported).toLocaleString('es-ES', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  confirmBox('Recuperar tus partidas', `Hay una copia de seguridad del ${when} con ${b.archive.length} partida${b.archive.length === 1 ? '' : 's'}${b.game ? ' y una partida en curso' : ''}. ¿Quieres recuperarla?`, 'Recuperar', () => {
+    const n = mergeBackup(b); save(); render(); toast(n + ' partidas recuperadas');
+  });
+}
+
+const GROUP_TEXT = '🃏 Partidas de Chinchón. Para tenerlas en tu móvil: guarda este archivo, abre Chinchón → ⋮ → 📊 Clasificación y partidas → 📜 Partidas → «Recibir partidas del grupo» y elígelo. No se duplica nada.';
+async function exportBackup(forGroup) {
   const d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
-  const name = 'chinchon-copia-' + stamp + '.json';
-  const data = JSON.stringify({ app: 'chinchon-marcador', format: 1, exported: d.toISOString(), archive: S.archive, game: S.game, theme: S.theme, lastNames: S.lastNames, lastCfg: S.lastCfg });
+  const name = (forGroup ? 'chinchon-partidas-' : 'chinchon-copia-') + stamp + '.json';
+  const data = backupJSON();
   try {
     if (isNative()) {
       const { Filesystem, Share } = window.Capacitor.Plugins;
       const r = await Filesystem.writeFile({ path: name, data, directory: 'CACHE', encoding: 'utf8' });
-      await Share.share({ title: 'Copia de Chinchón', text: 'Copia de seguridad de Chinchón · Marcador', files: [r.uri], dialogTitle: 'Guardar copia en…' });
+      await Share.share({ title: 'Partidas de Chinchón', text: forGroup ? GROUP_TEXT : 'Copia de seguridad de Chinchón · Marcador', files: [r.uri], dialogTitle: forGroup ? 'Enviar partidas al grupo' : 'Guardar copia en…' });
     } else {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
@@ -721,15 +823,13 @@ function importBackup() {
     rd.onload = () => {
       let b;
       try { b = JSON.parse(rd.result); } catch (e) { b = null; }
-      if (!b || b.app !== 'chinchon-marcador' || !Array.isArray(b.archive)) { toast('Ese archivo no es una copia de Chinchón'); return; }
+      if (!validBackup(b)) { toast('Ese archivo no es una copia de Chinchón'); return; }
       const have = new Set(S.archive.map(a => a.id));
       const nuevas = b.archive.filter(a => a && a.id && Array.isArray(a.players) && Array.isArray(a.events) && !have.has(a.id));
       const restoreGame = !S.game && b.game && Array.isArray(b.game.players);
       confirmBox('Importar copia', `Se añadirán ${nuevas.length} partida${nuevas.length === 1 ? '' : 's'} nueva${nuevas.length === 1 ? '' : 's'} al historial (las que ya tienes no se duplican)${restoreGame ? ' y se recuperará la partida que estaba en curso' : ''}.`, 'Importar', () => {
-        S.archive = S.archive.concat(nuevas).sort((x, y) => (y.finished || y.created || 0) - (x.finished || x.created || 0)).slice(0, MAX_ARCHIVE);
-        if (restoreGame) S.game = b.game;
-        if (!S.theme && b.theme) { S.theme = b.theme; applyTheme(S.theme); }
-        save(); render(); toast(nuevas.length + ' partidas importadas'); openArchive('partidas');
+        const n = mergeBackup(b);
+        save(); render(); toast(n + ' partidas importadas'); autoBackup(true); openArchive('partidas');
       });
     };
     rd.readAsText(f);
@@ -739,7 +839,8 @@ function importBackup() {
 
 /* ---------- Clasificación, jornadas y partidas ---------- */
 const JORNADA_HOUR = 6;      // la jornada empieza a las 6:00 (una noche larga cuenta como un solo día)
-const RANK_C = 5;            // partidas "virtuales" con las que se ajusta la valoración
+const RANK_C = 10;           // partidas "virtuales" con las que se ajusta la valoración
+const RANK_MIN = 5;          // con menos partidas, la valoración se marca como provisional
 const pad2 = n => String(n).padStart(2, '0');
 const nkey = n => String(n || '').trim().toLowerCase();
 function jornadaKey(ts) { const d = new Date(ts - JORNADA_HOUR * 3600e3); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -919,9 +1020,9 @@ function openArchive(tab) {
       note: 'Valoración 0–100: media por partida ajustada por partidas jugadas.' } };
     body = `<div class="kinds" style="margin:0 0 10px">${[['all', 'Siempre'], ['year', 'Este año'], ['month', 'Este mes']].map(([k, l]) => `<button data-period="${k}" class="${AV.period === k ? 'on' : ''}">${l}</button>`).join('')}</div>` +
       (list.length ? `<div class="tbl-wrap"><table><thead><tr><th>#</th><th style="text-align:left">Jugador</th><th>Valor.</th><th>PJ</th><th>G</th><th>% G</th><th>Pos. media</th><th>Pts</th><th>★</th><th>↻</th></tr></thead><tbody>` +
-        list.map((o, i) => `<tr data-player="${esc(o.name)}" style="cursor:pointer"><td>${medal(i)}</td><td style="text-align:left;font-weight:700;text-decoration:underline;text-decoration-color:var(--line)">${esc(o.name)}</td><td><b style="color:var(--gold);font-size:calc(16px * var(--fs, 1))">${Math.round(o.rating * 10)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${Math.round(o.g / o.pj * 100)}%</td><td>${fmt1(o.avgPos)}º</td><td>${fmt1(o.pts)}</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
+        list.map((o, i) => `<tr data-player="${esc(o.name)}" style="cursor:pointer"><td>${medal(i)}</td><td style="text-align:left;font-weight:700;text-decoration:underline;text-decoration-color:var(--line)">${esc(o.name)}${o.pj < RANK_MIN ? ' <small class="mut">*</small>' : ''}</td><td><b style="color:var(--gold);font-size:calc(16px * var(--fs, 1))">${Math.round(o.rating * 10)}</b></td><td>${o.pj}</td><td>${o.g}</td><td>${Math.round(o.g / o.pj * 100)}%</td><td>${fmt1(o.avgPos)}º</td><td>${fmt1(o.pts)}</td><td>${o.chin || ''}</td><td>${o.rebuys || ''}</td></tr>`).join('') +
         `</tbody></table></div>
-        <div class="mut" style="margin-top:6px">Toca un jugador para ver su ficha.</div>
+        <div class="mut" style="margin-top:6px">Toca un jugador para ver su ficha.${list.some(o => o.pj < RANK_MIN) ? ' * Menos de ' + RANK_MIN + ' partidas: valoración provisional.' : ''}</div>
         <button class="btn-ghost" data-share="rank" style="width:100%;margin-top:10px">📤 Compartir ranking como imagen</button>
         <details class="sec" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">¿Cómo se calcula?</summary>
           <div class="mut" style="margin-top:8px;line-height:1.5">
@@ -959,14 +1060,21 @@ function openArchive(tab) {
       '<button class="btn-ghost" data-share="records" style="width:100%;margin-top:6px">📤 Compartir récords como imagen</button>'
       : '<div class="empty">Aún no hay partidas terminadas.</div>';
   } else {
-    body = archiveHtml(S.archive.length) + `<div class="mut" style="margin:6px 0">Caben hasta ${MAX_ARCHIVE} partidas; al superarlas se borra la más antigua.</div>`;
+    body = archiveHtml(S.archive.length) + `<div class="mut" style="margin:6px 0">Caben hasta ${MAX_ARCHIVE} partidas; al superarlas se borra la más antigua.</div>` +
+      (isNative() ? `<div class="hrow mut" style="line-height:1.45">💾 <b>Copia automática:</b> ${S.lastAutoBackup ? 'última el ' + new Date(S.lastAutoBackup).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'se hará al terminar la próxima partida'}.
+        Se guarda en la app (Android la incluye en tu copia de Google)${S.autoBackupDocs ? ' y en la carpeta <b>Documentos/Chinchon</b> del móvil' : ''}.
+        Para pasar las partidas a otro móvil, usa también «Exportar».</div>` : '');
   }
   openModal(`<h3>📊 Clasificación y partidas</h3><div class="sub">${S.archive.length} partida${S.archive.length === 1 ? '' : 's'} guardada${S.archive.length === 1 ? '' : 's'}.</div>
     ${S.archive.length ? tabs : ''}${body}
-    ${AV.tab === 'partidas' || !S.archive.length ? `<div class="menu" style="margin-top:12px">${S.archive.length ? '<button id="aExp">⬆️ Exportar copia de seguridad</button>' : ''}<button id="aImp">⬇️ Importar copia de seguridad</button></div>` : ''}
+    ${AV.tab === 'partidas' || !S.archive.length ? `<div class="pf-t" style="margin-top:14px">👥 Jugar en grupo</div>
+      <div class="mut" style="margin-bottom:8px;line-height:1.45">Para que todos tengáis el mismo historial y ranking: quien anote una partida la envía al grupo y los demás la reciben. Las partidas que ya tengas no se duplican.</div>
+      <div class="menu">${S.archive.length ? '<button id="aGrp" class="btn-gold">📤 Enviar mis partidas al grupo</button>' : ''}<button id="aImp">📥 Recibir partidas del grupo (o una copia)</button>
+      ${S.archive.length ? '<button id="aExp">💾 Guardar copia de seguridad</button>' : ''}</div>` : ''}
     <div class="acts"><button class="btn-gold" id="aC">Cerrar</button></div>`);
   $('#aC').onclick = closeModal;
-  const ex = $('#aExp'); if (ex) ex.onclick = exportBackup;
+  const ex = $('#aExp'); if (ex) ex.onclick = () => exportBackup(false);
+  const gr = $('#aGrp'); if (gr) gr.onclick = () => exportBackup(true);
   const im = $('#aImp'); if (im) im.onclick = importBackup;
   document.querySelectorAll('#modal [data-tab]').forEach(b => b.onclick = () => openArchive(b.dataset.tab));
   document.querySelectorAll('#modal [data-period]').forEach(b => b.onclick = () => { AV.period = b.dataset.period; openArchive(); });
@@ -1066,6 +1174,7 @@ function finishAndNew(rematch) {
   if (R.hand > 0) {
     S.archive.unshift({ ...g, finished: Date.now(), hands: R.hand, winnerName: R.ended ? pname(g, R.ended.winner) : '(sin terminar)' });
     S.archive = S.archive.slice(0, MAX_ARCHIVE);
+    setTimeout(() => autoBackup(true), 500);
   }
   if (rematch) {
     // Revancha: mismos jugadores y reglas; da el siguiente al que dio primero
@@ -1227,7 +1336,8 @@ $('#menuBtn').onclick = () => {
       ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaño de letra</button>
       <button id="mAbout">ℹ️ Acerca de</button>
-      ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
+      <button id="mHelp">❓ Cómo se usa</button>
+      <button id="mWipe">🗑 Borrar datos…</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   } else {
     openModal(`<h3>Menú</h3><div class="menu">
@@ -1241,12 +1351,14 @@ $('#menuBtn').onclick = () => {
       <button id="mRoster">👥 Jugadores habituales</button>
       ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaño de letra</button>
+      <button id="mHelp">❓ Cómo se usa</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   }
   const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
   on('mClose', closeModal);
-  on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
+  on('mHelp', () => openWelcome(0));
+  on('mWipe', openWipe);
   on('mTheme', openThemes);
   on('mUpd', () => hasUpd() ? openUpdAvail() : checkUpdates(true));
   on('mRoster', openRoster);
@@ -1254,7 +1366,14 @@ $('#menuBtn').onclick = () => {
   on('mArch', () => openArchive('ranking'));
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
-      <div class="sub">v${APP_VERSION}<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="sub">v${APP_VERSION}<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com</div>
+      <details class="hrow" style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:700">🔒 Privacidad</summary>
+        <div class="mut" style="margin-top:8px;line-height:1.5">
+        • Tus partidas, jugadores y ajustes se guardan <b>solo en este móvil</b>. No hay cuentas ni registro.<br>
+        • La app <b>no recoge ningún dato personal</b> ni de uso, y no lleva anuncios ni rastreadores.<br>
+        • Solo se conecta a internet para <b>buscar actualizaciones</b> en GitHub (no envía información tuya) y, si tú lo pulsas, para abrir PayPal o compartir.<br>
+        • La copia de seguridad automática se queda en el móvil; Android puede incluirla en tu copia de Google si la tienes activada.<br>
+        • Responsable: IT Canarias · itcanarias.com</div></details>
       <div class="donate">
         <div class="dt">💛 Apoya el desarrollo de esta app</div>
         <div class="dd">Es gratis y sin anuncios. Con 1&nbsp;€ nos ayudas a seguir mejorándola y a crear nuevas apps como esta. ¡Gracias!</div>
@@ -1300,6 +1419,15 @@ applyTheme(S.theme);
 applyFont();
 refreshUpdBadge();
 setTimeout(autoCheckUpdates, 2500);
+// primero, si se ha reinstalado, ofrecer recuperar la copia; si no, la bienvenida a quien empieza
+setTimeout(async () => {
+  try { await offerRestore(); } catch (e) {}
+  if (!S.onboarded) {
+    if (S.archive.length || S.game) { S.onboarded = true; save(); }
+    else if ($('#modal').classList.contains('hidden')) openWelcome(0);
+  }
+}, 400);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoBackup(false); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoCheckUpdates(); });
 render();
 if (S.game) keepAwake();

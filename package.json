@@ -1,6 +1,6 @@
 {
   "name": "chinchon-marcador",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "private": true,
   "author": "IT Canarias",
   "license": "UNLICENSED",
@@ -8,6 +8,7 @@
   "scripts": {
     "sync": "npx cap sync android",
     "open": "npx cap open android",
+    "test": "node tests/app.test.mjs",
     "icons": "npx @capacitor/assets generate --android --iconBackgroundColor '#0e3b2c' --splashBackgroundColor '#0b2a20'"
   },
   "dependencies": {
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^7.0.0"
+    "@capacitor/cli": "^7.0.0",
+    "playwright": "^1.63.0"
   }
 }

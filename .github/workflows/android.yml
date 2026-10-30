@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - run: npm ci || npm install
+      - name: Pruebas automáticas (si fallan, no se publica)
+        run: npx playwright install --with-deps chromium && npm test
       - run: npx cap sync android
       - name: Preparar clave de firma
         env: { KS: "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" }
@@ -25,13 +27,13 @@ jobs:
             echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/chinchon-release.jks" >> "$GITHUB_ENV"
             echo "Firmando con la clave fija"
           else
-            echo "::warning::Sin clave fija: el APK no podrá actualizar al anterior"
+            echo "::error::Faltan los secretos ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD"; exit 1
           fi
       - name: Compilar APK
         working-directory: android
         env: { ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" }
-        run: chmod +x gradlew && ./gradlew assembleDebug
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk chinchon.apk
+        run: chmod +x gradlew && ./gradlew assembleRelease
+      - run: cp android/app/build/outputs/apk/release/app-release.apk chinchon.apk
       - name: Publicar versión
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
