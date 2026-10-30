@@ -113,6 +113,10 @@ tr.hand:active td{background:var(--card2)}
 #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
 #toast.on{opacity:1}
 .menu button{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--card)}
+.donate{background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:14px;margin-top:4px;text-align:center}
+.donate .dt{font-weight:800;font-size:17px;color:var(--gold)}
+.donate .dd{color:var(--mut);font-size:14px;margin:6px 0 12px}
+.donate button{width:100%;padding:14px;font-size:16px}
 .copy{text-align:center;color:var(--mut);font-size:12px;padding:8px 0 4px;opacity:.8}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
@@ -130,6 +134,13 @@ tr.hand:active td{background:var(--card2)}
 'use strict';
 /* ================= Estado y persistencia ================= */
 const KEY = 'chinchon.v1';
+const DONATE_URL = 'https://www.paypal.com/ncp/payment/KJCPZWMUM3JXG';
+// En la app Android (Capacitor) la navegación a otra web se abre en el navegador del sistema
+function openExternal(url) {
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) { location.href = url; return; }
+  const w = window.open(url, '_blank', 'noopener');
+  if (!w) location.href = url;
+}
 const DEF_CFG = {
   limit: 100,          // eliminado al pasar de este total
   closeBonus: -10,     // puntos al cerrar con todo ligado
@@ -540,7 +551,7 @@ $('#menuBtn').onclick = () => {
   if (!g) {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
-      <button id="mAbout">ℹ️ Acerca de</button>
+      <button id="mAbout">ℹ️ Acerca de · ☕ Donar</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   } else {
     openModal(`<h3>Menú</h3><div class="menu">
@@ -549,13 +560,24 @@ $('#menuBtn').onclick = () => {
       <button id="mPlayers">✏️ Cambiar nombres</button>
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
-      <button id="mAbout">ℹ️ Acerca de</button>
+      <button id="mAbout">ℹ️ Acerca de · ☕ Donar</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   }
   const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
-  on('mAbout', () => { openModal(`<h3>Chinchón · Marcador</h3><div class="sub">v1.0.1<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div><div class="acts"><button class="btn-gold" id="ok">Vale</button></div>`); $('#ok').onclick = closeModal; });
+  on('mAbout', () => {
+    openModal(`<h3>Chinchón · Marcador</h3>
+      <div class="sub">v1.0.2<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div>
+      <div class="donate">
+        <div class="dt">☕ ¿Te gusta esta app?</div>
+        <div class="dd">Es gratis y sin anuncios. Si te resulta útil, puedes invitar al desarrollador con 1&nbsp;€.</div>
+        <button class="btn-gold" id="donate">Donar 1 € con PayPal</button>
+      </div>
+      <div class="acts"><button class="btn-ghost" id="ok">Cerrar</button></div>`);
+    $('#ok').onclick = closeModal;
+    $('#donate').onclick = () => openExternal(DONATE_URL);
+  });
   on('mUndo', () => {
     const last = g.events[g.events.length - 1];
     const what = last.t === 'rebuy' ? 'el reenganche de ' + pname(g, last.p) : 'la última mano';
