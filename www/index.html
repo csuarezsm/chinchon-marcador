@@ -107,9 +107,16 @@ tr.hand:active td{background:var(--card2)}
 .scbox.fixed{opacity:.6}
 .hrow.act{outline:2px solid var(--gold);outline-offset:-2px}
 .kfoot{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));background:var(--felt);margin:6px -16px calc(-16px - env(safe-area-inset-bottom));padding:8px 16px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.keypad button{padding:12px 0;font-size:calc(24px * var(--fs, 1));font-weight:700;background:var(--card2)}
-.keypad .knext{background:var(--gold);color:var(--on-gold);font-size:calc(16px * var(--fs, 1))}
+.keypad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.keypad button{padding:0;height:clamp(38px, 6.2vh, 54px);font-size:calc(22px * var(--fs, 1));font-weight:700;background:var(--card2);border-radius:10px}
+.keypad .knext{background:var(--gold);color:var(--on-gold);font-size:calc(17px * var(--fs, 1));white-space:nowrap}
+.kfoot .acts{margin-top:6px!important;gap:8px}
+.kfoot .acts button{padding:10px}
+.kfoot .err{min-height:0;margin:0 0 4px}
+.hand .hrow{padding:6px 10px;margin-bottom:6px}
+.hand .scbox{min-height:42px;padding:4px}
+.hand .closebtn{padding:6px 8px}
+.hand label.f{padding:2px 0}
 #undoBar{position:fixed;left:14px;right:14px;bottom:calc(92px + env(safe-area-inset-bottom));max-width:692px;margin:0 auto;background:#000e;color:#fff;border-radius:14px;padding:8px 8px 8px 16px;display:flex;align-items:center;gap:10px;z-index:15;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .25s,transform .25s;font-size:calc(15px * var(--fs, 1))}
 #undoBar.on{opacity:1;transform:none;pointer-events:auto}
 #undoBar span{flex:1}
@@ -207,7 +214,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -957,6 +964,8 @@ function openHand(editIdx) {
     document.querySelectorAll('[data-sc]').forEach(b => { b.textContent = showVal(b.dataset.sc); b.classList.toggle('on', b.dataset.sc === H.active); });
     document.querySelectorAll('[data-row]').forEach(r => r.classList.toggle('act', r.dataset.row === H.active));
     const nx = $('#kNext'); if (nx) nx.disabled = !nextId();
+    const sh = document.querySelector('.sheet'), kf = document.querySelector('.kfoot');
+    if (sh && kf) sh.style.scrollPaddingBottom = (kf.offsetHeight + 8) + 'px';
     const a = document.querySelector('[data-row="' + H.active + '"]'); if (a) a.scrollIntoView({ block: 'nearest' });
   };
   const press = k => {
@@ -986,16 +995,18 @@ function openHand(editIdx) {
       </div>`;
     }).join('');
     openModal(`
+      <div class="hand">
       <h3>${editing ? 'Corregir' : 'Anotar'} mano ${n}</h3>
-      <div class="sub">Toca la casilla de cada jugador y escribe sus puntos con el teclado. Marca quién cerró.</div>
-      <label class="f" style="margin-bottom:8px"><span>Dio</span>
+      <label class="f" style="margin-bottom:6px"><span>Dio</span>
         <select id="hDealer">${(editing ? g.players : participants).map(p => `<option value="${p.id}" ${p.id === H.dealer ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
       ${rowsHtml}
+      </div>
       <div class="kfoot">
         <div class="err" id="hErr"></div>
         <div class="keypad" id="keypad">
-          ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `<button data-k="${d}">${d}</button>`).join('')}
-          <button data-k="del" aria-label="Borrar">⌫</button><button data-k="0">0</button><button data-k="next" class="knext" id="kNext">Siguiente ›</button>
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="del" aria-label="Borrar">⌫</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="0">0</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="next" class="knext" id="kNext" aria-label="Siguiente jugador">Sig. ›</button>
         </div>
         <div class="acts" style="margin-top:10px">
           ${editing ? '<button class="btn-red" id="hDel">Borrar mano</button>' : '<button class="btn-ghost" id="hCancel">Cancelar</button>'}
