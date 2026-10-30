@@ -125,6 +125,9 @@ tr.hand:active td{background:var(--card2)}
 .th .pv i{flex:1;height:38px;border-radius:8px;display:block}
 .th .pv b{width:26px;height:26px;border-radius:50%;display:block;flex:none}
 .th .tn{padding:8px 10px;font-weight:700;font-size:14px;display:flex;justify-content:space-between}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px}
+.chipb{padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:15px}
+.chipb.on{background:var(--gold);color:var(--on-gold);border-color:var(--gold);font-weight:700}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
@@ -178,7 +181,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -207,6 +210,14 @@ S.draft = S.draft || {
   cfg: Object.assign({}, DEF_CFG, S.lastCfg || {})
 };
 S.archive = S.archive || [];
+if (!Array.isArray(S.roster)) {
+  S.roster = [];
+  const seen = new Set();
+  const addSeed = n => { n = String(n || '').trim(); const k = n.toLowerCase(); if (n && !/^jugador \d+$/i.test(n) && !seen.has(k)) { seen.add(k); S.roster.push(n); } };
+  (S.lastNames || []).forEach(addSeed);
+  S.archive.forEach(a => (a.players || []).forEach(p => addSeed(p.name)));
+  if (S.game) S.game.players.forEach(p => addSeed(p.name));
+}
 
 /* ================= Motor de la partida ================= */
 function compute(g) {
@@ -336,15 +347,19 @@ function renderSetup() {
   const rows = d.names.map((n, i) => `
     <div class="pr">
       <button class="dealpick ${d.dealer === i ? 'on' : ''}" data-deal="${i}" title="Da primero">${d.dealer === i ? 'DA' : i + 1}</button>
-      <input type="text" maxlength="18" placeholder="Jugador ${i + 1}" value="${esc(n)}" data-name="${i}" autocomplete="off">
+      <input type="text" maxlength="18" placeholder="Jugador ${i + 1}" value="${esc(n)}" data-name="${i}" autocomplete="off" list="rosterList">
       <button data-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
       <button data-del="${i}" ${d.names.length <= 2 ? 'disabled' : ''} aria-label="Quitar">✕</button>
     </div>`).join('');
   $('#app').innerHTML = `
     <div class="sec plist">
       <h2>Jugadores</h2>
+      ${S.roster.length ? `<div class="mut" style="margin-bottom:6px">Toca los habituales para añadirlos o quitarlos:</div>
+      <div class="chips">${rosterSorted().map(n => `<button class="chipb ${d.names.some(x => nkey(x) === nkey(n)) ? 'on' : ''}" data-chip="${esc(n)}">${esc(n)}</button>`).join('')}
+        <button class="chipb" id="manageRoster" style="border-style:dashed">👥 Gestionar</button></div>` : ''}
       <div class="mut" style="margin-bottom:10px">Ponlos en el orden en que estáis sentados. Toca el círculo para elegir quién da primero.</div>
       ${rows}
+      <datalist id="rosterList">${S.roster.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <button class="btn-ghost" id="addP" style="width:100%" ${d.names.length >= 10 ? 'disabled' : ''}>+ Añadir jugador</button>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
@@ -365,21 +380,93 @@ function renderSetup() {
     syncNames(); syncCfg(); const i = +b.dataset.del; d.names.splice(i, 1);
     if (d.dealer >= d.names.length || d.dealer === i) d.dealer = 0; else if (d.dealer > i) d.dealer--; render();
   });
+  document.querySelectorAll('[data-chip]').forEach(b => b.onclick = () => {
+    syncNames(); syncCfg();
+    const n = b.dataset.chip, k = nkey(n), at = d.names.findIndex(x => nkey(x) === k);
+    if (at >= 0) {
+      if (d.names.length > 2) { d.names.splice(at, 1); if (d.dealer >= d.names.length || d.dealer === at) d.dealer = 0; else if (d.dealer > at) d.dealer--; }
+      else d.names[at] = '';
+    } else {
+      const empty = d.names.findIndex(x => !x.trim());
+      if (empty >= 0) d.names[empty] = n;
+      else if (d.names.length < 10) d.names.push(n);
+      else { toast('Máximo 10 jugadores'); return; }
+    }
+    save(); render();
+  });
+  const mr = $('#manageRoster'); if (mr) mr.onclick = () => { syncNames(); syncCfg(); openRoster(); };
   $('#addP').onclick = () => { syncNames(); syncCfg(); d.names.push(''); render(); setTimeout(() => { const ins = document.querySelectorAll('[data-name]'); ins[ins.length - 1].focus(); }, 50); };
   $('#start').onclick = () => {
     syncNames(); syncCfg();
-    const names = d.names.map((n, i) => n.trim() || ('Jugador ' + (i + 1)));
+    const names = d.names.map((n, i) => { const t = n.trim(); if (!t) return 'Jugador ' + (i + 1); const r = S.roster.find(x => nkey(x) === nkey(t)); return r || t; });
     const lower = names.map(n => n.toLowerCase());
     if (new Set(lower).size !== lower.length) { toast('Hay nombres repetidos'); return; }
     if (names.length < 2) { toast('Mínimo 2 jugadores'); return; }
     const players = names.map(n => ({ id: uid(), name: n }));
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[d.dealer].id, events: [] };
     S.lastNames = d.names.slice(); S.lastCfg = Object.assign({}, d.cfg);
+    names.forEach(n => { if (!/^Jugador \d+$/.test(n) && !S.roster.some(x => nkey(x) === nkey(n))) S.roster.push(n); });
     keepAwake();
     render();
   };
   document.querySelectorAll('[data-arch]').forEach(el => el.onclick = () => showArchived(+el.dataset.arch));
   const allA = $('#allArch'); if (allA) allA.onclick = () => openArchive('ranking');
+}
+
+/* ---------- Jugadores habituales ---------- */
+function rosterSorted() {
+  const c = {}; S.archive.forEach(a => a.players.forEach(p => { const k = nkey(p.name); c[k] = (c[k] || 0) + 1; }));
+  return S.roster.slice().sort((a, b) => (c[nkey(b)] || 0) - (c[nkey(a)] || 0) || a.localeCompare(b, 'es'));
+}
+function renameEverywhere(oldName, newName) {
+  const k = nkey(oldName);
+  const fix = g => g && g.players.forEach(p => { if (nkey(p.name) === k) p.name = newName; });
+  S.archive.forEach(a => { fix(a); if (nkey(a.winnerName) === k) a.winnerName = newName; });
+  fix(S.game);
+  if (S.draft) S.draft.names = S.draft.names.map(n => nkey(n) === k ? newName : n);
+  if (S.lastNames) S.lastNames = S.lastNames.map(n => nkey(n) === k ? newName : n);
+}
+function openRoster() {
+  const games = {}; S.archive.forEach(a => a.players.forEach(p => { const k = nkey(p.name); games[k] = (games[k] || 0) + 1; }));
+  const list = rosterSorted();
+  openModal(`<h3>👥 Jugadores habituales</h3>
+    <div class="sub">Corrige un nombre y se cambia también en el historial y el ranking. Si escribes el nombre de otro jugador de la lista, se <b>unen</b> (útil para «Tere» y «Teresa»).</div>
+    ${list.map((n, i) => `<div class="hrow"><div class="top">
+      <input type="text" maxlength="18" value="${esc(n)}" data-ro="${i}" data-orig="${esc(n)}" style="flex:1;min-width:0">
+      <span class="mut" style="white-space:nowrap">${games[nkey(n)] || 0} part.</span>
+      <button class="closebtn" data-rodel="${esc(n)}" aria-label="Quitar">✕</button></div></div>`).join('') || '<div class="empty">Aún no hay jugadores guardados.</div>'}
+    <div class="hrow"><div class="top"><input type="text" maxlength="18" id="roNew" placeholder="Nuevo jugador" style="flex:1;min-width:0"><button class="closebtn" id="roAdd">＋ Añadir</button></div></div>
+    <div class="mut">Quitar a alguien de la lista no borra sus partidas del historial.</div>
+    <div class="acts"><button class="btn-ghost" id="roC">Cancelar</button><button class="btn-gold" id="roS">Guardar</button></div>`);
+  const pending = { removed: new Set() };
+  $('#roC').onclick = () => { closeModal(); render(); };
+  document.querySelectorAll('[data-rodel]').forEach(b => b.onclick = () => { pending.removed.add(nkey(b.dataset.rodel)); b.closest('.hrow').style.display = 'none'; });
+  const readEdits = () => [...document.querySelectorAll('[data-ro]')].map(el => ({ o: el.dataset.orig, v: el.value.trim() }));
+  const applyRoster = (edits) => {
+    const merges = [];
+    edits.forEach(({ o, v }) => {
+      if (pending.removed.has(nkey(o)) || !v || v === o) return;
+      const target = S.roster.find(x => nkey(x) === nkey(v) && nkey(x) !== nkey(o));
+      if (target) merges.push(o + ' → ' + target);
+      renameEverywhere(o, target || v);
+      S.roster = S.roster.filter(x => nkey(x) !== nkey(o));
+      if (!target) S.roster.push(v);
+    });
+    S.roster = S.roster.filter(x => !pending.removed.has(nkey(x)));
+    return merges;
+  };
+  $('#roAdd').onclick = () => {
+    const v = $('#roNew').value.trim(); if (!v) return;
+    if (S.roster.some(x => nkey(x) === nkey(v))) { toast('Ya está en la lista'); return; }
+    applyRoster(readEdits()); S.roster.push(v); save(); openRoster();
+  };
+  $('#roS').onclick = () => {
+    const edits = readEdits();
+    const willMerge = edits.some(({ o, v }) => v && v !== o && !pending.removed.has(nkey(o)) && S.roster.some(x => nkey(x) === nkey(v) && nkey(x) !== nkey(o)));
+    const go = () => { const m = applyRoster(edits); save(); closeModal(); render(); toast(m.length ? 'Jugadores unidos' : 'Guardado'); };
+    if (willMerge) confirmBox('Unir jugadores', 'Las partidas de los dos nombres pasarán a contar como un solo jugador en el ranking. No se puede deshacer.', 'Unir', go);
+    else go();
+  };
 }
 
 function archiveHtml(max) {
@@ -791,6 +878,7 @@ $('#menuBtn').onclick = () => {
     openModal(`<h3>Menú</h3><div class="menu">
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
       <button id="mArch">📊 Clasificación y partidas</button>
+      <button id="mRoster">👥 Jugadores habituales</button>
       <button id="mUpd">🔄 Buscar actualizaciones</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
@@ -803,6 +891,7 @@ $('#menuBtn').onclick = () => {
       <button id="mShare">📋 Copiar resumen</button>
       <button id="mEnd">🏁 Terminar partida</button>
       <button id="mArch">📊 Clasificación y partidas</button>
+      <button id="mRoster">👥 Jugadores habituales</button>
       <button id="mUpd">🔄 Buscar actualizaciones</button>
       <button id="mTheme">🎨 Colores</button>
       <button id="mAbout">ℹ️ Acerca de</button>
@@ -813,6 +902,7 @@ $('#menuBtn').onclick = () => {
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
   on('mTheme', openThemes);
   on('mUpd', () => checkUpdates(true));
+  on('mRoster', openRoster);
   on('mArch', () => openArchive('ranking'));
   on('mAbout', () => {
     openModal(`<h3>Chinchón · Marcador</h3>
