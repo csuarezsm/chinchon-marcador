@@ -24,4 +24,4 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest chinchon.apk --title "Chinchón (última versión)" --notes "APK listo para instalar en Android."
+          gh release create latest chinchon.apk --title "Chinchón (última versión)" --notes "Chinchón · Marcador — © 2026 IT Canarias"

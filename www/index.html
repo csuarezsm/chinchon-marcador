@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="author" content="IT Canarias">
+<meta name="copyright" content="© 2026 IT Canarias">
 <meta name="theme-color" content="#0e3b2c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -111,6 +113,7 @@ tr.hand:active td{background:var(--card2)}
 #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
 #toast.on{opacity:1}
 .menu button{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--card)}
+.copy{text-align:center;color:var(--mut);font-size:12px;padding:8px 0 4px;opacity:.8}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
@@ -295,6 +298,7 @@ function renderSetup() {
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
     ${S.archive.length ? `<div class="sec"><h2>Partidas anteriores</h2>${archiveHtml()}</div>` : ''}
+    <div class="copy">© 2026 IT Canarias</div>
     <button class="btn-gold fab" id="start">Empezar partida</button>`;
   bindCfg('s_');
   const syncNames = () => document.querySelectorAll('[data-name]').forEach(el => d.names[+el.dataset.name] = el.value);
@@ -551,7 +555,7 @@ $('#menuBtn').onclick = () => {
   const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
-  on('mAbout', () => { openModal(`<h3>Chinchón · Marcador</h3><div class="sub">IT Canarias · v1.0.0<br>Todo se guarda en el propio móvil. Funciona sin conexión.</div><div class="acts"><button class="btn-gold" id="ok">Vale</button></div>`); $('#ok').onclick = closeModal; });
+  on('mAbout', () => { openModal(`<h3>Chinchón · Marcador</h3><div class="sub">v1.0.1<br>© 2026 IT Canarias. Todos los derechos reservados.<br>itcanarias.com<br><br>Todo se guarda en el propio móvil. Funciona sin conexión.</div><div class="acts"><button class="btn-gold" id="ok">Vale</button></div>`); $('#ok').onclick = closeModal; });
   on('mUndo', () => {
     const last = g.events[g.events.length - 1];
     const what = last.t === 'rebuy' ? 'el reenganche de ' + pname(g, last.p) : 'la última mano';

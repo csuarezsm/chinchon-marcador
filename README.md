@@ -1,7 +1,9 @@
 # Chinchón · Marcador
 
 Marcador de puntos para el chinchón. App Android (Capacitor) y PWA a partir del mismo código (`www/`).
-Paquete: `com.itcanarias.chinchon` · versión 1.0.0
+Paquete: `com.itcanarias.chinchon` · versión 1.0.1
+
+© 2026 IT Canarias. Todos los derechos reservados.
 
 ## Qué hace
 

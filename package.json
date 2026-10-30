@@ -1,7 +1,9 @@
 {
   "name": "chinchon-marcador",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
+  "author": "IT Canarias",
+  "license": "UNLICENSED",
   "description": "Marcador de puntos para el chinchón (IT Canarias)",
   "scripts": {
     "sync": "npx cap sync android",
