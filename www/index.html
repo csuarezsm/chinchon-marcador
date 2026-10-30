@@ -31,7 +31,7 @@ button[disabled]{opacity:.4}
 .btn-gold{background:var(--gold);color:var(--on-gold);font-weight:700}
 .btn-red{background:var(--red);color:#fff;font-weight:600}
 .btn-ghost{background:transparent;border:1px solid var(--line)}
-.icon{width:42px;height:42px;padding:0;display:grid;place-items:center;font-size:calc(20px * var(--fs, 1));background:transparent}
+.icon{position:relative;width:42px;height:42px;padding:0;display:grid;place-items:center;font-size:calc(20px * var(--fs, 1));background:transparent}
 .sec{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:14px}
 .sec h2{font-size:calc(15px * var(--fs, 1));margin:0 0 10px;color:var(--gold);text-transform:uppercase;letter-spacing:.6px}
 label.f{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
@@ -125,6 +125,7 @@ tr.hand:active td{background:var(--card2)}
 #toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:999px;font-size:calc(14px * var(--fs, 1));opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
 #toast.on{opacity:1}
 .menu button{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--card)}
+.menu button.btn-gold{background:var(--gold);color:var(--on-gold)}
 .donate{background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:14px;margin-top:4px;text-align:center}
 .donate .dt{font-weight:800;font-size:calc(17px * var(--fs, 1));color:var(--gold)}
 .donate .dd{color:var(--mut);font-size:calc(14px * var(--fs, 1));margin:6px 0 12px}
@@ -140,6 +141,9 @@ tr.hand:active td{background:var(--card2)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px}
 .chipb{padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:calc(15px * var(--fs, 1))}
 .chipb.on{background:var(--gold);color:var(--on-gold);border-color:var(--gold);font-weight:700}
+#menuBtn.dot::after{content:'';position:absolute;top:6px;right:6px;width:11px;height:11px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--felt)}
+#updBanner{display:none;background:var(--gold);color:var(--on-gold);font-weight:700;text-align:center;padding:10px 14px;cursor:pointer;font-size:calc(15px * var(--fs, 1))}
+#updBanner.on{display:block}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
 </head>
@@ -148,6 +152,7 @@ tr.hand:active td{background:var(--card2)}
   <h1 id="title">Chinchón<small id="subtitle">Marcador de puntos</small></h1>
   <button class="icon" id="menuBtn" aria-label="Menú">⋮</button>
 </header>
+<div id="updBanner" role="button"></div>
 <main id="app"></main>
 <div id="modal" class="modal hidden"></div>
 <div id="toast"></div>
@@ -202,7 +207,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -307,6 +312,7 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 function vibrate(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
 function openModal(html) { const m = $('#modal'); m.innerHTML = '<div class="sheet">' + html + '</div>'; m.classList.remove('hidden'); }
 function closeModal() { const m = $('#modal'); m.classList.add('hidden'); m.innerHTML = ''; }
+$('#updBanner').onclick = () => openUpdAvail();
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
 function confirmBox(title, text, okLabel, onOk, danger) {
   openModal(`<h3>${esc(title)}</h3><div class="sub">${esc(text)}</div>
@@ -523,11 +529,31 @@ async function checkUpdates(manual) {
     const apk = (j.assets || []).find(a => /\.apk$/i.test(a.name));
     S.lastUpdateCheck = Date.now(); save();
     if (!/^\d+\.\d+\.\d+$/.test(v) || !apk) { if (manual) showUpdMsg('No hay ninguna versión publicada todavía.'); return; }
-    if (cmpVer(v, APP_VERSION) > 0) showUpdate(v, apk.browser_download_url, j.html_url, (j.body || '').split('\n')[0]);
-    else if (manual) showUpdMsg(`Tienes la última versión (v${APP_VERSION}).`, '✅');
+    if (cmpVer(v, APP_VERSION) > 0) {
+      S.updAvail = { v, url: apk.browser_download_url, page: j.html_url, note: (j.body || '').split('\n')[0] }; save(); refreshUpdBadge();
+      // el aviso grande sale solo una vez por versión; la marca se queda hasta actualizar
+      const busy = !$('#modal').classList.contains('hidden');
+      if (manual || (!busy && S.updNotified !== v)) { S.updNotified = v; save(); openUpdAvail(); }
+    } else {
+      S.updAvail = null; save(); refreshUpdBadge();
+      if (manual) showUpdMsg(`Tienes la última versión (v${APP_VERSION}).`, '✅');
+    }
   } catch (e) {
     if (manual) showUpdMsg('No se pudo comprobar. Revisa que tengas conexión a internet.', '⚠️');
   }
+}
+function hasUpd() { return !!(S.updAvail && cmpVer(S.updAvail.v, APP_VERSION) > 0); }
+function openUpdAvail() { if (hasUpd()) showUpdate(S.updAvail.v, S.updAvail.url, S.updAvail.page, S.updAvail.note); }
+function refreshUpdBadge() {
+  const on = hasUpd();
+  $('#menuBtn').classList.toggle('dot', on);
+  const b = $('#updBanner');
+  b.classList.toggle('on', on);
+  if (on) b.innerHTML = `🎉 Nueva versión v${esc(S.updAvail.v)} disponible · <u>Actualizar</u>`;
+}
+function autoCheckUpdates() {
+  if (!isNative() || !navigator.onLine) return;
+  if (!S.lastUpdateCheck || Date.now() - S.lastUpdateCheck > 3600e3) checkUpdates(false);
 }
 function showUpdMsg(t, icon) { openModal(`<h3>${icon || 'ℹ️'} Actualizaciones</h3><div class="sub">${esc(t)}</div><div class="acts"><button class="btn-gold" id="uOk">Vale</button></div>`); $('#uOk').onclick = closeModal; }
 function showUpdate(v, url, page, note) {
@@ -1029,7 +1055,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
-      <button id="mUpd">🔄 Buscar actualizaciones</button>
+      ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaño de letra</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       ${S.archive.length ? '<button id="mClearArch">🗑 Borrar historial de partidas</button>' : ''}
@@ -1044,7 +1070,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
-      <button id="mUpd">🔄 Buscar actualizaciones</button>
+      ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaño de letra</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
@@ -1053,7 +1079,7 @@ $('#menuBtn').onclick = () => {
   on('mClose', closeModal);
   on('mClearArch', () => confirmBox('Borrar historial', 'Se borrarán todas las partidas guardadas.', 'Borrar', () => { S.archive = []; render(); }, true));
   on('mTheme', openThemes);
-  on('mUpd', () => checkUpdates(true));
+  on('mUpd', () => hasUpd() ? openUpdAvail() : checkUpdates(true));
   on('mRoster', openRoster);
   on('mShareApp', () => { closeModal(); shareApp(); });
   on('mArch', () => openArchive('ranking'));
@@ -1103,7 +1129,9 @@ $('#menuBtn').onclick = () => {
 /* ================= Arranque ================= */
 applyTheme(S.theme);
 applyFont();
-setTimeout(() => { if (isNative() && (!S.lastUpdateCheck || Date.now() - S.lastUpdateCheck > 20 * 3600e3)) checkUpdates(false); }, 2500);
+refreshUpdBadge();
+setTimeout(autoCheckUpdates, 2500);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoCheckUpdates(); });
 render();
 if (S.game) keepAwake();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
