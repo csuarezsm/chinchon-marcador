@@ -211,6 +211,19 @@ tr.hand:active td{background:var(--card2)}
   .pt-info{margin:8px 0}
   .pt-acts button{padding:10px 6px}
 }
+/* Tablets: la mesa se amplía para aprovechar la pantalla */
+body:has(.pt-table){padding-bottom:env(safe-area-inset-bottom)}
+@media (min-width: 560px) and (min-height: 880px) {
+  main:has(.pt-table){max-width:none}
+  .pt-table{zoom:1.15;max-width:500px;margin:0 auto}
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  main:has(.pt-table){max-width:none}
+  .pt-table{zoom:1.4;max-width:520px;margin:0 auto}
+}
+@media (min-width: 980px) and (min-height: 940px) {
+  .pt-table{zoom:1.7}
+}
 .pt-hand.mini{justify-content:flex-start;margin-top:6px}
 .pt-info{text-align:center;color:var(--mut);font-size:calc(13px * min(var(--fs, 1), 1.1));margin:10px 0}
 .pt-acts{display:flex;gap:8px}
@@ -302,7 +315,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.6.2';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
