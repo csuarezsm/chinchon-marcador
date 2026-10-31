@@ -210,7 +210,16 @@ function renderTable(g, R) {
   if (myOut) hint = 'Estás eliminado en esta partida.';
   else if (!myTurn) hint = h.phase === 'over' ? '' : 'Juega ' + pname(g, h.turn) + '…';
   else if (h.phase === 'draw') hint = 'Tu turno: roba del <b>mazo</b> o coge la carta del <b>descarte</b>.';
-  else hint = playSel ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : 'Toca <b>Tirar</b> para descartar esta carta.') : 'Elige la carta que quieres tirar.';
+  else {
+    // Explica si se puede cerrar y con qué carta, para que el botón apagado no sea un misterio
+    const bd = bestDiscard(h.hands[my]), name = cardName(card(bd.discard));
+    const howTo = bd.bm.dead <= CLOSE_MAX
+      ? `Puedes cerrar tirando el <b>${name}</b> (te quedan ${bd.bm.dead}).`
+      : `Para cerrar necesitas ${CLOSE_MAX} o menos sin ligar; tirando el ${name} te quedarían ${bd.bm.dead}.`;
+    hint = playSel
+      ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : `Tirando esta te quedarían ${selDead.dead} sin ligar. ${bd.bm.dead <= CLOSE_MAX ? howTo : 'Toca <b>Tirar</b>.'}`)
+      : 'Elige la carta que quieres tirar. ' + howTo;
+  }
   $('#app').innerHTML = `
     <div class="pt-opps">${opp.map(p => `<div class="pt-opp ${h.turn === p.id && h.phase !== 'over' ? 'turn' : ''}">
         <div class="pt-on">${esc(p.name)}</div><div class="pt-ot">${R.st[p.id].total} pts</div>
