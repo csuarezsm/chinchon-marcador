@@ -122,6 +122,10 @@ function drawFrom(h, src) {
   if (!h.deck.length) { const top = h.discard.pop(); h.deck = h.discard.sort(() => Math.random() - .5); h.discard = [top]; }
   return h.deck.shift();
 }
+// Vuelta actual (1 = la primera, en la que todos juegan una vez) y si ya se puede cerrar
+const roundOf = h => Math.floor(h.turns / h.order.length) + 1;
+const closeFrom = g => g.play.closeFrom || 2;
+const canCloseNow = g => roundOf(g.play.hand) >= closeFrom(g);
 function nextTurn(h) {
   const i = h.order.indexOf(h.turn);
   h.turn = h.order[(i + 1) % h.order.length]; h.phase = 'draw'; h.turns++;
@@ -143,7 +147,7 @@ function closeHand(g, closer, discardId) {
   }
   if (discardId) h.discard.push(discardId);
   h.phase = 'over';
-  h.result = { closer, kind, scores, detail };
+  h.result = { closer, kind, scores, detail, round: roundOf(h) };
   g.events.push({ t: 'hand', dealer: h.dealer, closer: closer || null, kind: closer ? kind : 'normal', scores, at: Date.now() });
 }
 
@@ -169,7 +173,7 @@ function botStep(g) {
   if (easy && Math.random() < .25) {
     const loose = bestMelds(hand).loose; if (loose.length) { const d = loose[Math.floor(Math.random() * loose.length)]; const rest = hand.filter(x => x !== d); best = { discard: d, rest, bm: bestMelds(rest) }; }
   }
-  const canClose = best.bm.dead <= CLOSE_MAX;
+  const canClose = best.bm.dead <= CLOSE_MAX && canCloseNow(g);
   const wantClose = canClose && (easy ? best.bm.dead <= 2 || h.turns > 40 : true);
   h.hands[pid] = best.rest;
   if (wantClose) { closeHand(g, pid, best.discard); h.log = pname(g, pid) + ' cierra' + (g.play.hand.result.kind === 'chinchon' ? ' ¡con CHINCHÓN!' : g.play.hand.result.kind === 'bonus' ? ' con todo ligado.' : '.'); return; }
@@ -221,7 +225,7 @@ function renderTable(g, R) {
   const arr = h.hands[my] ? arrangeHand(h.hands[my]) : null;
   let selDead = null;
   if (arr && myTurn && h.phase === 'discard' && playSel && h.hands[my].includes(playSel)) selDead = bestMelds(h.hands[my].filter(x => x !== playSel));
-  const canClose = selDead && selDead.dead <= CLOSE_MAX;
+  const canClose = selDead && selDead.dead <= CLOSE_MAX && canCloseNow(g);
   const opp = g.players.filter(p => h.order.includes(p.id) && p.id !== my);
   // Modo aprendizaje: solo si está activado, la app sugiere jugadas
   const learn = !!g.play.learn;
@@ -231,7 +235,7 @@ function renderTable(g, R) {
     tip = { draw: wt && wt.discard !== top && wt.bm.dead < now ? 'discard' : 'deck', gain: wt ? now - wt.bm.dead : 0 };
   } else if (learn && myTurn && h.phase === 'discard') {
     const bd = bestDiscard(h.hands[my]);
-    tip = { discard: bd.discard, dead: bd.bm.dead, close: bd.bm.dead <= CLOSE_MAX };
+    tip = { discard: bd.discard, dead: bd.bm.dead, close: bd.bm.dead <= CLOSE_MAX && canCloseNow(g), early: bd.bm.dead <= CLOSE_MAX && !canCloseNow(g) };
   }
   let hint = '';
   if (myOut) hint = 'Estás eliminado en esta partida.';
@@ -241,6 +245,7 @@ function renderTable(g, R) {
     : 'Tu turno: roba del <b>mazo</b> o coge la carta del <b>descarte</b>.';
   else if (tip) hint = tip.close
     ? `💡 Puedes <b>cerrar</b> tirando <b>${theCard(card(tip.discard))}</b> (te quedan ${tip.dead}).`
+    : tip.early ? `💡 Tira <b>${theCard(card(tip.discard))}</b>. Te quedarían ${tip.dead}, pero aún no se puede cerrar (desde la ${closeFrom(g)}ª vuelta).`
     : `💡 Tira <b>${theCard(card(tip.discard))}</b>. Te quedarían ${tip.dead} sin ligar; para cerrar hacen falta ${CLOSE_MAX} o menos.`;
   else hint = playSel ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : 'Toca <b>Tirar</b> para descartar esta carta.') : 'Elige la carta que quieres tirar.';
   const cs = CARD_SIZES.find(x => x[0] === String(S.cardScale || '1')) || CARD_SIZES[0];
@@ -255,7 +260,7 @@ function renderTable(g, R) {
     <div class="pt-log">${esc(h.log || '')}</div></div><div class="pt-r">
     <div class="pt-hint">${hint}</div>
     ${arr ? `<div class="pt-hand ${cs[0] !== '1' ? 'big' : ''}">${arr.ids.map(id => cardHtml(id, { sel: id === playSel, meld: learn ? arr.meldOf[id] : null, tip: tip && tip.discard === id, isNew: myTurn && h.phase === 'discard' && id === h.fresh, data: `data-card="${id}"` })).join('')}</div>
-    <div class="pt-info">${learn ? `Sin ligar: <b>${arr.bm.dead}</b> pts · ` : ''}Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo · <button class="pt-learn" id="pLearn">💡 Aprendizaje: ${learn ? 'sí' : 'no'}</button> <button class="pt-learn" id="pSize">🔍 Cartas: ${cs[1]}</button></div>
+    <div class="pt-info">${!canCloseNow(g) ? `<span class="pt-early">🔒 Se puede cerrar desde la ${closeFrom(g)}ª vuelta (vais por la ${roundOf(h)}ª)</span><br>` : ''}${learn ? `Sin ligar: <b>${arr.bm.dead}</b> pts · ` : ''}Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo · <button class="pt-learn" id="pLearn">💡 Aprendizaje: ${learn ? 'sí' : 'no'}</button> <button class="pt-learn" id="pSize">🔍 Cartas: ${cs[1]}</button></div>
     <div class="pt-acts">
       <button class="btn-ghost" id="pScore">📋 Puntos</button>
       <button class="btn-gold" id="pDrop" ${myTurn && h.phase === 'discard' && playSel ? '' : 'disabled'}>Tirar</button>
@@ -287,7 +292,8 @@ function humanDiscard(g, close) {
   if (h.turn !== my || h.phase !== 'discard' || !playSel) return;
   const d = playSel; playSel = null;
   h.hands[my] = h.hands[my].filter(x => x !== d);
-  if (close) { if (bestMelds(h.hands[my]).dead > CLOSE_MAX) { h.hands[my].push(d); toast('Para cerrar necesitas ' + CLOSE_MAX + ' o menos sin ligar'); return; } closeHand(g, my, d); h.log = 'Has cerrado.'; }
+  if (close) { if (!canCloseNow(g)) { h.hands[my].push(d); toast('Aún no se puede cerrar: desde la ' + closeFrom(g) + 'ª vuelta'); return; }
+    if (bestMelds(h.hands[my]).dead > CLOSE_MAX) { h.hands[my].push(d); toast('Para cerrar necesitas ' + CLOSE_MAX + ' o menos sin ligar'); return; } closeHand(g, my, d); h.log = 'Has cerrado.'; }
   else { h.discard.push(d); h.log = 'Has tirado ' + theCard(card(d)) + '.'; nextTurn(h); }
   vibrate(20); save(); render();
 }
@@ -325,7 +331,7 @@ function showHandResult(g) {
 function renderPlaySetup() {
   $('#subtitle').textContent = 'Jugar contra la máquina';
   const d = S.draft;
-  d.play = Object.assign({ name: '', bots: 2, level: 'normal', jokers: 0, jokerValue: 0 }, d.play || {});
+  d.play = Object.assign({ name: '', bots: 2, level: 'normal', jokers: 0, jokerValue: 0, closeFrom: 2 }, d.play || {});
   if (d.play.jvRule !== 2) { d.play.jokerValue = 0; d.play.jvRule = 2; }       // nueva regla por defecto: suelto vale 0
   if (!Array.isArray(d.play.botNames) || d.play.noDefaults !== 1) { d.play.botNames = ['', '', '']; if (d.play.noDefaults !== 1 && BOTS.some(n => nkey(n) === nkey(d.play.name))) d.play.name = ''; d.play.noDefaults = 1; }
   while (d.play.botNames.length < 3) d.play.botNames.push('');
@@ -339,11 +345,12 @@ function renderPlaySetup() {
       ${Array.from({ length: d.play.bots }, (_, i) => `<label class="f"><span>🤖 Rival ${i + 1}</span>
         <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="Rival ${i + 1}" style="flex:1;min-width:0">
         <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
+      <label class="f"><span>🔒 Se puede cerrar desde<em>En la primera vuelta normalmente no</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[1, 2, 3].map(k => `<button data-closefrom="${k}" class="${(d.play.closeFrom || 2) === k ? 'on' : ''}">${k}ª vuelta</button>`).join('')}</span></label>
       <label class="f"><span>★ Comodines<em>Sustituyen a cualquier carta</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[0, 'Sin'], [2, '2 comodines']].map(([k, l]) => `<button data-jokers="${k}" class="${(d.play.jokers || 0) === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>0 = no suma y se puede cerrar con él suelto</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
       <label class="f"><span>💡 Modo aprendizaje<em>La app te sugiere qué robar, qué tirar y cuándo cerrar</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[false, 'No'], [true, 'Sí']].map(([k, l]) => `<button data-learn="${k}" class="${!!d.play.learn === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
-      <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas${d.play.jokers ? ' y ' + d.play.jokers + ' comodines' : ''}, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
+      <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas${d.play.jokers ? ' y ' + d.play.jokers + ' comodines' : ''}, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar, desde la ${d.play.closeFrom || 2}ª vuelta; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
     <div class="copy">© 2026 IT Canarias</div>
@@ -366,6 +373,7 @@ function renderPlaySetup() {
   $('#plName').oninput = sync;
   document.querySelectorAll('.sec input, .sec select').forEach(el => el.addEventListener('change', sync));
   document.querySelectorAll('[data-bots]').forEach(b => b.onclick = () => { sync(); d.play.bots = +b.dataset.bots; render(); });
+  document.querySelectorAll('[data-closefrom]').forEach(b => b.onclick = () => { sync(); d.play.closeFrom = +b.dataset.closefrom; render(); });
   document.querySelectorAll('[data-jokers]').forEach(b => b.onclick = () => { sync(); d.play.jokers = +b.dataset.jokers; render(); });
   const jv = $('#plJV'); if (jv) jv.onchange = () => { const v = parseInt(jv.value, 10); d.play.jokerValue = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0; save(); };
   document.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { sync(); d.play.learn = b.dataset.learn === 'true'; render(); });
@@ -382,7 +390,7 @@ function renderPlaySetup() {
       taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
     });
     const players = [meP, ...bots];
-    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 0, bots: bots.map(b => b.id), hand: null } };
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 0, closeFrom: d.play.closeFrom || 2, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);
     S.lastCfg = Object.assign({}, d.cfg);
     d.play.name = ''; d.play.botNames = ['', '', ''];          // la próxima partida empieza sin nombres

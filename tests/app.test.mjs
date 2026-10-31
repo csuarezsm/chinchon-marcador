@@ -193,7 +193,7 @@ console.log('Juego contra la máquina');
   check('la máquina tira la carta que más pesa sin ligar', m.disc === 'o12', m.disc);
   // 150 partidas completas entre máquinas
   const sim = await p.evaluate(() => {
-    let games = 0, hands = 0, bad = 0, ended = 0;
+    let games = 0, hands = 0, bad = 0, ended = 0, early = 0;
     for (let k = 0; k < 150; k++) {
       const n = 2 + (k % 3), ps = Array.from({ length: n }, (_, i) => ({ id: uid(), name: '🤖 ' + i }));
       const g = { id: uid(), created: Date.now(), cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: k % 2 ? 'facil' : 'normal', bots: ps.map(x => x.id), hand: null } };
@@ -206,10 +206,11 @@ console.log('Juego contra la máquina');
         const e = g.events[g.events.length - 1];
         if (!e || Object.keys(e.scores).length !== h.order.length) bad++;
         if (e.closer && e.kind === 'normal' && e.scores[e.closer] > 5) bad++;
+        if (e.closer && h.result.round < 2) early++;
       }
       games++; if (compute(g).ended) ended++;
     }
-    return { games, hands, bad, ended };
+    return { games, hands, bad, ended, early };
   });
   const jk = await p.evaluate(() => { JOKER_VALUE = 0; return ({
     group: bestMelds(['o5', 'c5', 'j1', 'b2', 'b3', 'b4', 'o1']).dead,          // 5-5-comodín + 2-3-4 de bastos, suelto el as
@@ -257,6 +258,8 @@ console.log('Juego contra la máquina');
   check(`60 partidas con comodines sin errores (${simJ.hands} manos)`, simJ.bad === 0 && simJ.ended === 60, JSON.stringify(simJ));
   check(`150 partidas simuladas sin errores (${sim.hands} manos)`, sim.bad === 0, JSON.stringify(sim));
   check('todas las partidas simuladas terminan', sim.ended === sim.games, JSON.stringify(sim));
+  check('nadie cierra en la primera vuelta', sim.early === 0, JSON.stringify(sim));
+  check('regla: desde la 2ª vuelta por defecto', await p.evaluate(() => { const g = { play: { hand: { turns: 2, order: ['a', 'b', 'c'] } } }; const r1 = canCloseNow(g); g.play.hand.turns = 3; return !r1 && canCloseNow(g); }));
   // partida jugada desde la pantalla
   await p.evaluate(() => { window.PLAY_DELAY = 10; });
   await p.click('[data-mode="play"]');
