@@ -16,6 +16,7 @@ const RANK_LABEL = r => ({ 10: 'S', 11: 'C', 12: 'R' })[r] || String(r);
 const RANK_NAME = r => ({ 1: 'as', 10: 'sota', 11: 'caballo', 12: 'rey' })[r] || String(r);
 const CLOSE_MAX = 5;                                          // se cierra con 5 o menos sin ligar
 const BOTS = ['Paco', 'Lola', 'Manolo'];
+const BOT_IDEAS = ['Pancho', 'Chano', 'Candelaria', 'Tomasa', 'Juanillo', 'Nieves', 'Pepito', 'Carmela', 'Domingo', 'Fefa', 'Agustín', 'Chona', 'Ramón', 'Pino', 'Chicho', 'Luci'];
 
 const card = id => ({ id, s: id[0], r: Number(id.slice(1)) });
 const cardValue = c => (c.r <= 7 ? c.r : 10);
@@ -290,6 +291,8 @@ function renderPlaySetup() {
   $('#subtitle').textContent = 'Jugar contra la máquina';
   const d = S.draft;
   d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal' }, d.play || {});
+  if (!Array.isArray(d.play.botNames)) d.play.botNames = BOTS.slice();
+  while (d.play.botNames.length < 3) d.play.botNames.push(BOTS[d.play.botNames.length]);
   $('#app').innerHTML = `
     ${modeToggleHtml()}
     <div class="sec">
@@ -297,6 +300,9 @@ function renderPlaySetup() {
       <label class="f"><span>Tu nombre</span><input type="text" id="plName" maxlength="18" value="${esc(d.play.name)}" placeholder="Tu nombre" list="rosterList" style="width:55%"></label>
       <datalist id="rosterList">${(S.roster || []).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <label class="f"><span>Rivales</span><span class="kinds" style="flex:none;width:55%;margin:0">${[1, 2, 3].map(n => `<button data-bots="${n}" class="${d.play.bots === n ? 'on' : ''}">${n}</button>`).join('')}</span></label>
+      ${Array.from({ length: d.play.bots }, (_, i) => `<label class="f"><span>🤖 Rival ${i + 1}</span>
+        <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="${BOTS[i]}" style="flex:1;min-width:0">
+        <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
       <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
     </div>
@@ -305,7 +311,19 @@ function renderPlaySetup() {
     <button class="btn-gold fab" id="plStart">🃏 Empezar a jugar</button>`;
   bindCfg('s_');
   bindModeToggle();
-  const sync = () => { d.play.name = $('#plName').value; d.cfg = readCfg('s_'); save(); };
+  const sync = () => {
+    d.play.name = $('#plName').value;
+    document.querySelectorAll('[data-botname]').forEach(el => (d.play.botNames[+el.dataset.botname] = el.value));
+    d.cfg = readCfg('s_'); save();
+  };
+  document.querySelectorAll('[data-botname]').forEach(el => (el.oninput = sync));
+  document.querySelectorAll('[data-botdice]').forEach(b => b.onclick = () => {
+    sync();
+    const used = new Set(d.play.botNames.map(nkey).concat(nkey(d.play.name)));
+    const free = BOT_IDEAS.filter(n => !used.has(nkey(n)));
+    d.play.botNames[+b.dataset.botdice] = free[Math.floor(Math.random() * free.length)] || BOTS[+b.dataset.botdice];
+    save(); render();
+  });
   $('#plName').oninput = sync;
   document.querySelectorAll('.sec input, .sec select').forEach(el => el.addEventListener('change', sync));
   document.querySelectorAll('[data-bots]').forEach(b => b.onclick = () => { sync(); d.play.bots = +b.dataset.bots; render(); });
@@ -314,7 +332,13 @@ function renderPlaySetup() {
     sync();
     const myName = (d.play.name || '').trim() || 'Yo';
     const meP = { id: uid(), name: (S.roster || []).find(x => nkey(x) === nkey(myName)) || myName };
-    const bots = BOTS.slice(0, d.play.bots).map(n => ({ id: uid(), name: '🤖 ' + n }));
+    // nombres de los rivales: los que hayas puesto (limpios y sin repetir) o los de siempre
+    const taken = new Set([nkey(myName)]);
+    const bots = Array.from({ length: d.play.bots }, (_, i) => {
+      let n = cleanName(d.play.botNames[i]).replace(/^🤖\s*/, '') || BOTS[i];
+      let k = 2; const base = n; while (taken.has(nkey(n))) n = base + ' ' + k++;
+      taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
+    });
     const players = [meP, ...bots];
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);

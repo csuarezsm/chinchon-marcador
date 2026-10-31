@@ -217,6 +217,7 @@ console.log('Juego contra la máquina');
   await p.evaluate(() => { window.PLAY_DELAY = 10; });
   await p.click('[data-mode="play"]');
   await p.fill('#plName', 'Carlos'); await p.click('[data-bots="2"]');
+  await p.fill('[data-botname="0"]', 'Chano'); await p.fill('[data-botname="1"]', 'carlos');
   await p.click('#plStart');
   let guard = 0, handsDone = 0;
   while (guard++ < 4000) {
@@ -235,6 +236,7 @@ console.log('Juego contra la máquina');
   const fin = await p.evaluate(() => ({ ended: !!(S.game && compute(S.game).ended), hands: S.game ? compute(S.game).hand : 0 }));
   check(`partida completa jugando desde la pantalla (${fin.hands} manos)`, fin.ended, JSON.stringify(fin));
   await p.click('#newGame');
+  check('nombres de rivales personalizados y sin repetir', await p.evaluate(() => S.archive[0].players.map(x => x.name).join() === 'Carlos,🤖 Chano,🤖 carlos 2'), await p.evaluate(() => S.archive[0].players.map(x => x.name).join()));
   check('la partida contra la máquina queda en el historial', await p.evaluate(() => S.archive.length === 1 && S.archive[0].players.some(x => x.name.startsWith('🤖'))));
   check('los rivales de la máquina no se añaden a jugadores habituales', await p.evaluate(() => !S.roster.some(n => n.startsWith('🤖')) && S.roster.includes('Carlos')));
   check('sin errores de JavaScript', !errors.length, errors.join(' | '));
