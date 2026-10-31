@@ -231,10 +231,10 @@ console.log('Juego contra la máquina');
   const bonus = await p.evaluate(() => {
     const ps = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
     const mk = hand => { const g = { id: uid(), created: 1, cfg: Object.assign({}, DEF_CFG), players: ps, firstDealer: 'a', events: [], play: { jokers: 2, jokerValue: 0, bots: ['b'], hand: { dealer: 'a', order: ['a', 'b'], hands: { a: hand, b: ['o1', 'c3', 'e5', 'b7', 'o10', 'c11', 'e12'] }, deck: [], discard: [] } } }; closeHand(g, 'a', null); return g.events[0].scores.a; };
-    return { looseJoker: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1']), allTied: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'b6']) };
+    return { jokerTied: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1']), allTied: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'b5']), looseJoker: mk(['o5', 'c5', 'e5', 'b5', 'o1', 'c2', 'j1']) };
   });
-  check('cerrar con el comodín suelto suma 0, no −10', bonus.looseJoker === 0, JSON.stringify(bonus));
-  check('con las 7 ligadas sí da −10', bonus.allTied === -10, JSON.stringify(bonus));
+  check('con el comodín ligado y todo lo demás ligado da −10', bonus.jokerTied === -10 && bonus.allTied === -10, JSON.stringify(bonus));
+  check('con el comodín suelto no es «todo ligado»: suma lo suelto', bonus.looseJoker === 3, JSON.stringify(bonus));
   check('la máquina no tira el comodín', jk.disc !== 'j1', jk.disc);
   const simJ = await p.evaluate(() => {
     let bad = 0, hands = 0, ended = 0, jokerPlays = 0;
@@ -260,6 +260,7 @@ console.log('Juego contra la máquina');
   // partida jugada desde la pantalla
   await p.evaluate(() => { window.PLAY_DELAY = 10; });
   await p.click('[data-mode="play"]');
+  check('sin nombres por defecto', await p.evaluate(() => [...document.querySelectorAll('#plName, [data-botname]')].every(i => i.value === '')));
   await p.fill('#plName', 'Carlos'); await p.click('[data-bots="2"]');
   await p.fill('[data-botname="0"]', 'Chano'); await p.fill('[data-botname="1"]', 'carlos');
   await p.click('#plStart');
@@ -281,7 +282,7 @@ console.log('Juego contra la máquina');
   check(`partida completa jugando desde la pantalla (${fin.hands} manos)`, fin.ended, JSON.stringify(fin));
   await p.click('#newGame');
   // modo aprendizaje
-  await p.click('[data-mode="play"]'); await p.click('#plStart');
+  await p.click('[data-mode="play"]'); await p.fill('#plName', 'Carlos'); await p.fill('[data-botname="0"]', 'Chano'); await p.fill('[data-botname="1"]', 'carlos'); await p.click('#plStart');
   for (let i = 0; i < 200; i++) { const st = await p.evaluate(() => { const h = S.game.play.hand; return h && h.turn === me(S.game) && h.phase === 'draw'; }); if (st) break; await p.waitForTimeout(25); }
   check('por defecto la mesa no sugiere jugadas', await p.evaluate(() => !/💡/.test(document.querySelector('.pt-hint').textContent) && !document.querySelector('.tip')));
   await p.click('#pLearn');

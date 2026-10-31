@@ -325,10 +325,10 @@ function showHandResult(g) {
 function renderPlaySetup() {
   $('#subtitle').textContent = 'Jugar contra la máquina';
   const d = S.draft;
-  d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal', jokers: 0, jokerValue: 0 }, d.play || {});
+  d.play = Object.assign({ name: '', bots: 2, level: 'normal', jokers: 0, jokerValue: 0 }, d.play || {});
   if (d.play.jvRule !== 2) { d.play.jokerValue = 0; d.play.jvRule = 2; }       // nueva regla por defecto: suelto vale 0
-  if (!Array.isArray(d.play.botNames)) d.play.botNames = BOTS.slice();
-  while (d.play.botNames.length < 3) d.play.botNames.push(BOTS[d.play.botNames.length]);
+  if (!Array.isArray(d.play.botNames) || d.play.noDefaults !== 1) { d.play.botNames = ['', '', '']; if (d.play.noDefaults !== 1 && BOTS.some(n => nkey(n) === nkey(d.play.name))) d.play.name = ''; d.play.noDefaults = 1; }
+  while (d.play.botNames.length < 3) d.play.botNames.push('');
   $('#app').innerHTML = `
     ${modeToggleHtml()}
     <div class="sec">
@@ -337,7 +337,7 @@ function renderPlaySetup() {
       <datalist id="rosterList">${(S.roster || []).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <label class="f"><span>Rivales</span><span class="kinds" style="flex:none;width:55%;margin:0">${[1, 2, 3].map(n => `<button data-bots="${n}" class="${d.play.bots === n ? 'on' : ''}">${n}</button>`).join('')}</span></label>
       ${Array.from({ length: d.play.bots }, (_, i) => `<label class="f"><span>🤖 Rival ${i + 1}</span>
-        <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="${BOTS[i]}" style="flex:1;min-width:0">
+        <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="Rival ${i + 1}" style="flex:1;min-width:0">
         <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
       <label class="f"><span>★ Comodines<em>Sustituyen a cualquier carta</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[0, 'Sin'], [2, '2 comodines']].map(([k, l]) => `<button data-jokers="${k}" class="${(d.play.jokers || 0) === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>0 = no suma y se puede cerrar con él suelto</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
@@ -360,7 +360,7 @@ function renderPlaySetup() {
     sync();
     const used = new Set(d.play.botNames.map(nkey).concat(nkey(d.play.name)));
     const free = BOT_IDEAS.filter(n => !used.has(nkey(n)));
-    d.play.botNames[+b.dataset.botdice] = free[Math.floor(Math.random() * free.length)] || BOTS[+b.dataset.botdice];
+    d.play.botNames[+b.dataset.botdice] = free[Math.floor(Math.random() * free.length)] || '';
     save(); render();
   });
   $('#plName').oninput = sync;
@@ -372,12 +372,12 @@ function renderPlaySetup() {
   document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { sync(); d.play.level = b.dataset.level; render(); });
   $('#plStart').onclick = () => {
     sync();
-    const myName = (d.play.name || '').trim() || 'Yo';
+    const myName = (d.play.name || '').trim() || 'Tú';
     const meP = { id: uid(), name: (S.roster || []).find(x => nkey(x) === nkey(myName)) || myName };
     // nombres de los rivales: los que hayas puesto (limpios y sin repetir) o los de siempre
     const taken = new Set([nkey(myName)]);
     const bots = Array.from({ length: d.play.bots }, (_, i) => {
-      let n = cleanName(d.play.botNames[i]).replace(/^🤖\s*/, '') || BOTS[i];
+      let n = cleanName(d.play.botNames[i]).replace(/^🤖\s*/, '') || 'Rival ' + (i + 1);
       let k = 2; const base = n; while (taken.has(nkey(n))) n = base + ' ' + k++;
       taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
     });
@@ -385,6 +385,7 @@ function renderPlaySetup() {
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 0, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);
     S.lastCfg = Object.assign({}, d.cfg);
+    d.play.name = ''; d.play.botNames = ['', '', ''];          // la próxima partida empieza sin nombres
     playSel = null; keepAwake(); render();
   };
 }
