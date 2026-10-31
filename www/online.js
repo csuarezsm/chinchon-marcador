@@ -6,7 +6,7 @@
    © 2026 IT Canarias
    ===================================================================== */
 const ONLINE_URL = () => window.ONLINE_URL || 'wss://juegos.itcanarias.com/ws';
-const ON = { ws: null, estado: 'desconectado', sala: null, sel: null, quiere: false, intentos: 0, timer: null, ping: null, ultimoTurno: null };
+const ON = { ws: null, estado: 'desconectado', sala: null, sel: null, quiere: false, intentos: 0, timer: null, ping: null, ultimoTurno: null, listo: null };   // listo: el servidor ya juega al chinchón (null = aún no se sabe)
 
 function onToken() {
   S.online = S.online || {};
@@ -35,7 +35,13 @@ function onConectar() {
   };
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.t === 'sala') onRecibirSala(m.sala);
+    if (m.t === 'hola') {
+      // un servidor que aún no tiene el chinchón (versión anterior): se avisa y se vuelve a probar en un minuto
+      if (m.protocolo === 1 || (Array.isArray(m.juegos) && !m.juegos.includes('chinchon'))) { ON.listo = false; onSetEstado('preparando'); ON.ws = null; ws.close(); clearTimeout(ON.timer); if (ON.quiere) ON.timer = setTimeout(onConectar, 60000); return; }
+      if (m.version) { ON.listo = true; onSetEstado('conectado'); }
+      return;
+    }
+    if (m.t === 'sala') { ON.listo = true; onRecibirSala(m.sala); }
     else if (m.t === 'error') toast(m.msg);
     else if (m.t === 'fuera') { toast(m.motivo || 'Has salido de la partida'); onRecibirSala(null); }
   };
@@ -53,11 +59,13 @@ function onEnviar(m) {
   ON.ws.send(JSON.stringify(m)); return true;
 }
 function onSetEstado(e) {
+  if (e === 'desconectado' && ON.listo === false) e = 'preparando';
   ON.estado = e;
+  document.querySelectorAll('#onJoin, #onCreate').forEach(b => { b.disabled = e === 'preparando'; });
   const el = $('#onStatus'); if (el) el.innerHTML = onEstadoHtml();
   const bar = $('#onBar'); if (bar) bar.classList.toggle('off', e !== 'conectado');
 }
-const onEstadoHtml = () => ({ conectado: '🟢 Conectado', conectando: '🟡 Conectando…', desconectado: '🔴 Sin conexión · reintentando' })[ON.estado];
+const onEstadoHtml = () => ({ conectado: '🟢 Conectado', conectando: '🟡 Conectando…', desconectado: '🔴 Sin conexión · reintentando', preparando: '🛠 El juego en línea estará disponible muy pronto' })[ON.estado];
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ON.quiere && ON.estado !== 'conectado') { ON.intentos = 0; onConectar(); } });
 
 function onRecibirSala(sala) {
@@ -110,14 +118,14 @@ function onRenderInicio() {
     <div class="sec"><h2>Unirse a una partida</h2>
       <div class="mut" style="margin-bottom:8px">Pide el código a quien la ha creado.</div>
       <div class="row" style="gap:8px"><input id="onCode" maxlength="4" placeholder="Código" autocomplete="off" autocapitalize="characters" style="flex:1;min-width:0;width:0;text-transform:uppercase;letter-spacing:4px;font-weight:700;text-align:center">
-      <button class="btn-gold" id="onJoin" style="flex:1;min-width:0">Unirse</button></div>
+      <button class="btn-gold" id="onJoin" style="flex:1;min-width:0" ${ON.estado === 'preparando' ? 'disabled' : ''}>Unirse</button></div>
     </div>
     <div class="sec"><h2>Crear una partida</h2>
       <label class="f"><span>Eliminado al pasar de</span><input type="number" inputmode="numeric" id="onLim" value="${o.limite}"></label>
       <label class="f"><span>Se puede cerrar desde</span>${seg('cerrarDesde', o.cerrarDesde, [[1, '1ª vuelta'], [2, '2ª vuelta'], [3, '3ª vuelta']])}</label>
       <label class="f"><span>Comodines</span>${seg('comodines', o.comodines, [[0, 'Sin'], [2, '2 comodines']])}</label>
       <label class="f"><span>Nivel de la máquina<em>Si rellenas sillas con la máquina</em></span>${seg('nivel', o.nivel, [['facil', 'Fácil'], ['normal', 'Normal'], ['dificil', 'Difícil']])}</label>
-      <button class="btn-gold" id="onCreate" style="width:100%;margin-top:8px">Crear partida</button>
+      <button class="btn-gold" id="onCreate" style="width:100%;margin-top:8px" ${ON.estado === 'preparando' ? 'disabled' : ''}>Crear partida</button>
     </div>
     <div class="mut" id="onStatus" style="text-align:center;margin:6px 0 20px">${onEstadoHtml()}</div>`;
   bindModeToggle();

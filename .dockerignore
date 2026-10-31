@@ -1,7 +1,0 @@
-# Solo lo que necesita el servidor de juegos
-*
-!server/package.json
-!server/package-lock.json
-!server/src
-!www/marcador.js
-!www/juego.js

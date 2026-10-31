@@ -1,7 +1,7 @@
 # Chinchón · Marcador
 
 Marcador de puntos para el chinchón. App Android (Capacitor) y PWA a partir del mismo código (`www/`).
-Paquete: `com.itcanarias.chinchon` · versión 2.7.0
+Paquete: `com.itcanarias.chinchon` · versión 2.8.0
 
 © 2026 IT Canarias. Todos los derechos reservados.
 
@@ -19,7 +19,9 @@ Paquete: `com.itcanarias.chinchon` · versión 2.7.0
 - **Bote** (opcional): importe de entrada y de cada reenganche.
 - **Historial**: tabla mano a mano. Si tocas una mano, la puedes corregir o borrar y todo se recalcula. También se puede deshacer el último movimiento.
 - **Final**: ganador, revancha con los mismos jugadores (da el siguiente) e historial de partidas.
-- Funciona sin conexión, todo se guarda en el móvil y la pantalla no se apaga durante la partida.
+- **Contra la máquina**: de 1 a 3 rivales con tres niveles, comodines opcionales y modo aprendizaje (`www/juego.js`).
+- **En línea**: partidas de 2 a 4 jugadores con código de sala y la máquina en las sillas libres (`www/online.js`). Usa el servidor común de juegos de IT Canarias, [csuarezsm/juegos-servidor](https://github.com/csuarezsm/juegos-servidor) (`wss://juegos.itcanarias.com/ws`), que carga las reglas de `www/marcador.js` y `www/juego.js`. Si cambian las reglas, hay que copiar esos dos archivos a `motores/chinchon/` del servidor y reinstalarlo.
+- Funciona sin conexión (salvo el juego en línea), todo se guarda en el móvil y la pantalla no se apaga durante la partida.
 
 ## Compilar el APK
 

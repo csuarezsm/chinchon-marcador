@@ -310,11 +310,17 @@ console.log('Juego contra la máquina');
 // Jugar en línea: dos personas en dos móviles + la máquina, contra el servidor real
 {
   console.log('Jugar en línea');
+  // Copia local del servidor común (csuarezsm/juegos-servidor) con las reglas de ESTA versión de la app
   const { createRequire } = await import('node:module');
   const os = await import('node:os'); const fs = await import('node:fs');
-  Object.assign(process.env, { PASO_BOT_MS: '30', SEGUIR_MS: '6000', AUSENTE_MS: '800', DATA_DIR: fs.mkdtempSync(join(os.tmpdir(), 'juegos-')) });
-  const req = createRequire(import.meta.url);
-  const { crearServidor } = req('../server/src/server.js');
+  const SERV = process.env.JUEGOS_SERVIDOR || fileURLToPath(new URL('../../juegos-servidor/', import.meta.url));
+  const motores = fs.mkdtempSync(join(os.tmpdir(), 'motores-'));
+  fs.mkdirSync(join(motores, 'chinchon'));
+  for (const f of ['marcador.js', 'juego.js']) fs.copyFileSync(join(ROOT, f), join(motores, 'chinchon', f));
+  fs.cpSync(join(SERV, 'motores', 'ajedrez'), join(motores, 'ajedrez'), { recursive: true });
+  Object.assign(process.env, { PASO_BOT_MS: '30', SEGUIR_MS: '6000', AUSENTE_MS: '800', MOTORES_DIR: motores, DATA_DIR: fs.mkdtempSync(join(os.tmpdir(), 'juegos-')) });
+  const req = createRequire(join(SERV, 'package.json'));
+  const { crearServidor } = req('./src/server.js');
   const { server: js } = crearServidor();
   await new Promise(r => js.listen(0, '127.0.0.1', r));
   const WS = `ws://127.0.0.1:${js.address().port}/ws`;
@@ -373,6 +379,17 @@ console.log('Juego contra la máquina');
   check('la máquina ocupa la silla de quien abandona', await B2.p.evaluate(() => !!(ON.sala && ON.sala.asientos.find(a => a.id === 'p1').bot)));
   check('en línea, sin errores de JavaScript', !A.errors.length && !B.errors.length, [...A.errors, ...B.errors].join(' | '));
   await A.ctx.close(); await B.ctx.close(); js.close();
+  // servidor antiguo (sin chinchón): la app avisa de que estará disponible pronto y no deja crear
+  const { WebSocketServer } = req('ws');
+  const viejo = new WebSocketServer({ port: 0 });
+  viejo.on('connection', w => w.send(JSON.stringify({ t: 'hola', protocolo: 1, juegos: ['ajedrez'] })));
+  await new Promise(r => viejo.on('listening', r));
+  const ctxV = await browser.newContext({ viewport: { width: 412, height: 860 }, serviceWorkers: 'block' });
+  await ctxV.addInitScript(u => { window.ONLINE_URL = u; localStorage.setItem('chinchon.v1', JSON.stringify({ onboarded: true })); }, `ws://127.0.0.1:${viejo.address().port}`);
+  const pv = await ctxV.newPage(); await pv.goto(URL_APP); await pv.click('[data-mode="online"]');
+  await pv.waitForSelector('#onStatus:has-text("muy pronto")', { timeout: 5000 }).catch(() => {});
+  check('con un servidor sin chinchón avisa y no deja crear', /muy pronto/.test(await pv.textContent('#onStatus')) && await pv.$eval('#onCreate', b => b.disabled));
+  await ctxV.close(); viejo.close();
 }
 
 // Versión de Google Play: sin actualizador propio ni donativos
