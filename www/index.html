@@ -205,6 +205,10 @@ tr.hand:active td{background:var(--card2)}
 .pc-o{color:#a87400}.pc-c{color:#b03024}.pc-e{color:#22508f}.pc-b{color:#2e7d32}
 .pc-s{width:62%;display:block}.pc-s svg{width:100%;height:auto;display:block}
 .pc-new{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--on-gold);font-style:normal;font-size:10px;font-weight:800;border-radius:6px;padding:0 4px;line-height:1.5}
+.pc-card.tip{border-color:var(--gold);border-style:dashed;box-shadow:0 0 0 3px rgba(232,184,74,.35)}
+.pt-btn.tip .pc-card{animation:tipPulse 1.2s ease-in-out infinite}
+@keyframes tipPulse{50%{box-shadow:0 0 0 7px rgba(232,184,74,.45)}}
+.pt-learn{background:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:calc(12px * var(--fs, 1));color:var(--mut);margin-left:4px}
 .pc-m{position:absolute;left:6px;right:6px;bottom:2px;height:4px;border-radius:2px;background:var(--mc)}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
@@ -270,7 +274,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.1.2';
+const APP_VERSION = '2.2.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -1261,7 +1265,7 @@ function finishAndNew(rematch) {
     const order = g.players.map(p => p.id), i = order.indexOf(g.firstDealer);
     const players = g.players.map(p => ({ id: uid(), name: p.name }));
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, g.cfg), players, firstDealer: players[(i + 1) % players.length].id, events: [] };
-    if (g.play) S.game.play = { level: g.play.level, bots: g.players.map((p, k) => g.play.bots.includes(p.id) ? players[k].id : null).filter(Boolean), hand: null };
+    if (g.play) S.game.play = { level: g.play.level, learn: !!g.play.learn, bots: g.players.map((p, k) => g.play.bots.includes(p.id) ? players[k].id : null).filter(Boolean), hand: null };
   } else {
     S.draft.names = g.players.map(p => p.name); S.draft.cfg = Object.assign({}, g.cfg); S.draft.dealer = 0;
     S.game = null;

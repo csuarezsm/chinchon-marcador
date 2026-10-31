@@ -236,6 +236,15 @@ console.log('Juego contra la máquina');
   const fin = await p.evaluate(() => ({ ended: !!(S.game && compute(S.game).ended), hands: S.game ? compute(S.game).hand : 0 }));
   check(`partida completa jugando desde la pantalla (${fin.hands} manos)`, fin.ended, JSON.stringify(fin));
   await p.click('#newGame');
+  // modo aprendizaje
+  await p.click('[data-mode="play"]'); await p.click('#plStart');
+  for (let i = 0; i < 200; i++) { const st = await p.evaluate(() => { const h = S.game.play.hand; return h && h.turn === me(S.game) && h.phase === 'draw'; }); if (st) break; await p.waitForTimeout(25); }
+  check('por defecto la mesa no sugiere jugadas', await p.evaluate(() => !/💡/.test(document.querySelector('.pt-hint').textContent) && !document.querySelector('.tip')));
+  await p.click('#pLearn');
+  check('con aprendizaje sugiere qué robar', await p.evaluate(() => /💡/.test(document.querySelector('.pt-hint').textContent) && !!document.querySelector('.pt-btn.tip')));
+  await p.click('#pDeck');
+  check('con aprendizaje marca la carta que conviene tirar', await p.evaluate(() => document.querySelector('.pc-card.tip')?.dataset.card === bestDiscard(S.game.play.hand.hands[me(S.game)]).discard));
+  await p.click('#menuBtn'); await p.click('#mEnd'); await p.click('#cOk');
   check('nombres de rivales personalizados y sin repetir', await p.evaluate(() => S.archive[0].players.map(x => x.name).join() === 'Carlos,🤖 Chano,🤖 carlos 2'), await p.evaluate(() => S.archive[0].players.map(x => x.name).join()));
   check('la partida contra la máquina queda en el historial', await p.evaluate(() => S.archive.length === 1 && S.archive[0].players.some(x => x.name.startsWith('🤖'))));
   check('los rivales de la máquina no se añaden a jugadores habituales', await p.evaluate(() => !S.roster.some(n => n.startsWith('🤖')) && S.roster.includes('Carlos')));

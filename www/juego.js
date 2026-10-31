@@ -21,6 +21,7 @@ const BOT_IDEAS = ['Pancho', 'Chano', 'Candelaria', 'Tomasa', 'Juanillo', 'Nieve
 const card = id => ({ id, s: id[0], r: Number(id.slice(1)) });
 const cardValue = c => (c.r <= 7 ? c.r : 10);
 const cardName = c => RANK_NAME(c.r) + ' de ' + SUIT_NAME[c.s];
+const theCard = c => (c.r === 10 ? 'la ' : 'el ') + cardName(c);   // «la sota», «el rey»
 function newDeck() {
   const d = [];
   for (const s of SUITS) for (const r of RANKS) d.push(s + r);
@@ -148,7 +149,7 @@ function botStep(g) {
     const got = drawFrom(h, src);
     hand.push(got);
     h.phase = 'discard';
-    h.log = pname(g, pid) + (src === 'discard' ? ' coge el ' + cardName(card(got)) + ' del descarte.' : ' roba del mazo.');
+    h.log = pname(g, pid) + (src === 'discard' ? ' coge ' + theCard(card(got)) + ' del descarte.' : ' roba del mazo.');
     return;
   }
   let best = bestDiscard(hand);
@@ -160,7 +161,7 @@ function botStep(g) {
   h.hands[pid] = best.rest;
   if (wantClose) { closeHand(g, pid, best.discard); h.log = pname(g, pid) + ' cierra' + (g.play.hand.result.kind === 'chinchon' ? ' ¡con CHINCHÓN!' : g.play.hand.result.kind === 'bonus' ? ' con todo ligado.' : '.'); return; }
   h.discard.push(best.discard);
-  h.log += ' Tira el ' + cardName(card(best.discard)) + '.';
+  h.log += ' Tira ' + theCard(card(best.discard)) + '.';
   nextTurn(h);
   if (h.turns > 400) closeHand(g, null, null);                // por seguridad: nadie cierra
 }
@@ -179,7 +180,7 @@ function cardHtml(id, opts) {
   opts = opts || {};
   if (!id) return '<div class="pc-card empty"></div>';
   const c = card(id), tag = opts.data ? 'button' : 'div';   // solo las cartas de tu mano son botones
-  return `<${tag} class="pc-card ${opts.sel ? 'sel' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="${cardName(c)}" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
+  return `<${tag} class="pc-card ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="${cardName(c)}" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
     <b class="pc-r pc-${c.s}">${RANK_LABEL(c.r)}</b><span class="pc-s">${SUIT_SVG[c.s]}</span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new">nueva</em>' : ''}</${tag}>`;
 }
 function backHtml(n) { return `<div class="pc-card back"><span>${n != null ? n : ''}</span></div>`; }
@@ -206,32 +207,38 @@ function renderTable(g, R) {
   if (arr && myTurn && h.phase === 'discard' && playSel && h.hands[my].includes(playSel)) selDead = bestMelds(h.hands[my].filter(x => x !== playSel));
   const canClose = selDead && selDead.dead <= CLOSE_MAX;
   const opp = g.players.filter(p => h.order.includes(p.id) && p.id !== my);
+  // Modo aprendizaje: solo si está activado, la app sugiere jugadas
+  const learn = !!g.play.learn;
+  let tip = null;                                              // { draw: 'deck'|'discard' } o { discard: id, close: bool, dead }
+  if (learn && myTurn && h.phase === 'draw') {
+    const now = bestMelds(h.hands[my]).dead, wt = top ? bestDiscard([...h.hands[my], top]) : null;
+    tip = { draw: wt && wt.discard !== top && wt.bm.dead < now ? 'discard' : 'deck', gain: wt ? now - wt.bm.dead : 0 };
+  } else if (learn && myTurn && h.phase === 'discard') {
+    const bd = bestDiscard(h.hands[my]);
+    tip = { discard: bd.discard, dead: bd.bm.dead, close: bd.bm.dead <= CLOSE_MAX };
+  }
   let hint = '';
   if (myOut) hint = 'Estás eliminado en esta partida.';
   else if (!myTurn) hint = h.phase === 'over' ? '' : 'Juega ' + pname(g, h.turn) + '…';
-  else if (h.phase === 'draw') hint = 'Tu turno: roba del <b>mazo</b> o coge la carta del <b>descarte</b>.';
-  else {
-    // Explica si se puede cerrar y con qué carta, para que el botón apagado no sea un misterio
-    const bd = bestDiscard(h.hands[my]), name = cardName(card(bd.discard));
-    const howTo = bd.bm.dead <= CLOSE_MAX
-      ? `Puedes cerrar tirando el <b>${name}</b> (te quedan ${bd.bm.dead}).`
-      : `Para cerrar necesitas ${CLOSE_MAX} o menos sin ligar; tirando el ${name} te quedarían ${bd.bm.dead}.`;
-    hint = playSel
-      ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : `Tirando esta te quedarían ${selDead.dead} sin ligar. ${bd.bm.dead <= CLOSE_MAX ? howTo : 'Toca <b>Tirar</b>.'}`)
-      : 'Elige la carta que quieres tirar. ' + howTo;
-  }
+  else if (h.phase === 'draw') hint = tip
+    ? (tip.draw === 'discard' ? `💡 Coge <b>${theCard(card(top))}</b> del descarte: te liga ${tip.gain} punto${tip.gain === 1 ? '' : 's'}.` : `💡 Roba del <b>mazo</b>: ${top ? theCard(card(top)) : 'el descarte'} no te liga nada.`)
+    : 'Tu turno: roba del <b>mazo</b> o coge la carta del <b>descarte</b>.';
+  else if (tip) hint = tip.close
+    ? `💡 Puedes <b>cerrar</b> tirando <b>${theCard(card(tip.discard))}</b> (te quedan ${tip.dead}).`
+    : `💡 Tira <b>${theCard(card(tip.discard))}</b>. Te quedarían ${tip.dead} sin ligar; para cerrar hacen falta ${CLOSE_MAX} o menos.`;
+  else hint = playSel ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : 'Toca <b>Tirar</b> para descartar esta carta.') : 'Elige la carta que quieres tirar.';
   $('#app').innerHTML = `
     <div class="pt-opps">${opp.map(p => `<div class="pt-opp ${h.turn === p.id && h.phase !== 'over' ? 'turn' : ''}">
         <div class="pt-on">${esc(p.name)}</div><div class="pt-ot">${R.st[p.id].total} pts</div>
         <div class="pt-ob">${'<i></i>'.repeat(Math.min(8, (h.hands[p.id] || []).length))}</div></div>`).join('')}</div>
     <div class="pt-mid">
-      <div class="pt-pile"><button class="pt-btn" id="pDeck" ${myTurn && h.phase === 'draw' ? '' : 'disabled'}>${backHtml(h.deck.length)}</button><small>Mazo</small></div>
-      <div class="pt-pile"><button class="pt-btn" id="pDisc" ${myTurn && h.phase === 'draw' && top ? '' : 'disabled'}>${top ? cardHtml(top) : cardHtml(null)}</button><small>Descarte</small></div>
+      <div class="pt-pile"><button class="pt-btn ${tip && tip.draw === 'deck' ? 'tip' : ''}" id="pDeck" ${myTurn && h.phase === 'draw' ? '' : 'disabled'}>${backHtml(h.deck.length)}</button><small>Mazo</small></div>
+      <div class="pt-pile"><button class="pt-btn ${tip && tip.draw === 'discard' ? 'tip' : ''}" id="pDisc" ${myTurn && h.phase === 'draw' && top ? '' : 'disabled'}>${top ? cardHtml(top) : cardHtml(null)}</button><small>Descarte</small></div>
     </div>
     <div class="pt-log">${esc(h.log || '')}</div>
     <div class="pt-hint">${hint}</div>
-    ${arr ? `<div class="pt-hand">${arr.ids.map(id => cardHtml(id, { sel: id === playSel, meld: arr.meldOf[id], isNew: myTurn && h.phase === 'discard' && id === h.fresh, data: `data-card="${id}"` })).join('')}</div>
-    <div class="pt-info">Sin ligar: <b>${arr.bm.dead}</b> pts · Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo</div>
+    ${arr ? `<div class="pt-hand">${arr.ids.map(id => cardHtml(id, { sel: id === playSel, meld: learn ? arr.meldOf[id] : null, tip: tip && tip.discard === id, isNew: myTurn && h.phase === 'discard' && id === h.fresh, data: `data-card="${id}"` })).join('')}</div>
+    <div class="pt-info">${learn ? `Sin ligar: <b>${arr.bm.dead}</b> pts · ` : ''}Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo · <button class="pt-learn" id="pLearn">💡 Aprendizaje: ${learn ? 'sí' : 'no'}</button></div>
     <div class="pt-acts">
       <button class="btn-ghost" id="pScore">📋 Puntos</button>
       <button class="btn-gold" id="pDrop" ${myTurn && h.phase === 'discard' && playSel ? '' : 'disabled'}>Tirar</button>
@@ -241,8 +248,9 @@ function renderTable(g, R) {
   if (deckB) deckB.onclick = () => humanDraw(g, 'deck');
   if (discB) discB.onclick = () => humanDraw(g, 'discard');
   document.querySelectorAll('[data-card]').forEach(b => b.onclick = () => { if (!myTurn || h.phase !== 'discard') return; playSel = playSel === b.dataset.card ? null : b.dataset.card; vibrate(8); render(); });
+  const lb = $('#pLearn'); if (lb) lb.onclick = () => { g.play.learn = !g.play.learn; S.draft.play && (S.draft.play.learn = g.play.learn); save(); toast(g.play.learn ? '💡 Modo aprendizaje activado' : 'Modo aprendizaje desactivado'); render(); };
   const drop = $('#pDrop'); if (drop) drop.onclick = () => humanDiscard(g, false);
-  const cl = $('#pClose'); if (cl) cl.onclick = () => confirmBox('Cerrar la mano', `Tiras el ${cardName(card(playSel))} y enseñas tus cartas.`, 'Cerrar', () => humanDiscard(g, true));
+  const cl = $('#pClose'); if (cl) cl.onclick = () => confirmBox('Cerrar la mano', `Tiras ${theCard(card(playSel))} y enseñas tus cartas.`, 'Cerrar', () => humanDiscard(g, true));
   $('#pScore').onclick = () => { openModal(`<h3>📋 Puntuaciones</h3>${historyTable(g, compute(g), false)}<div class="acts"><button class="btn-gold" id="psOk">Volver a la mesa</button></div>`); $('#psOk').onclick = closeModal; };
   if (h.phase === 'over') { showHandResult(g); return; }
   if (myOut) { runBotsInstant(g); save(); render(); return; }
@@ -253,7 +261,7 @@ function humanDraw(g, src) {
   if (h.turn !== my || h.phase !== 'draw') return;
   const got = drawFrom(h, src);
   h.hands[my].push(got); h.phase = 'discard'; playSel = null; h.fresh = got;
-  h.log = 'Has ' + (src === 'discard' ? 'cogido el ' : 'robado el ') + cardName(card(got)) + '.';
+  h.log = 'Has ' + (src === 'discard' ? 'cogido ' : 'robado ') + theCard(card(got)) + '.';
   vibrate(15); save(); render();
 }
 function humanDiscard(g, close) {
@@ -262,7 +270,7 @@ function humanDiscard(g, close) {
   const d = playSel; playSel = null;
   h.hands[my] = h.hands[my].filter(x => x !== d);
   if (close) { if (bestMelds(h.hands[my]).dead > CLOSE_MAX) { h.hands[my].push(d); toast('Para cerrar necesitas ' + CLOSE_MAX + ' o menos sin ligar'); return; } closeHand(g, my, d); h.log = 'Has cerrado.'; }
-  else { h.discard.push(d); h.log = 'Has tirado el ' + cardName(card(d)) + '.'; nextTurn(h); }
+  else { h.discard.push(d); h.log = 'Has tirado ' + theCard(card(d)) + '.'; nextTurn(h); }
   vibrate(20); save(); render();
 }
 function showHandResult(g) {
@@ -312,6 +320,7 @@ function renderPlaySetup() {
       ${Array.from({ length: d.play.bots }, (_, i) => `<label class="f"><span>🤖 Rival ${i + 1}</span>
         <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="${BOTS[i]}" style="flex:1;min-width:0">
         <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
+      <label class="f"><span>💡 Modo aprendizaje<em>La app te sugiere qué robar, qué tirar y cuándo cerrar</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[false, 'No'], [true, 'Sí']].map(([k, l]) => `<button data-learn="${k}" class="${!!d.play.learn === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
     </div>
@@ -336,6 +345,7 @@ function renderPlaySetup() {
   $('#plName').oninput = sync;
   document.querySelectorAll('.sec input, .sec select').forEach(el => el.addEventListener('change', sync));
   document.querySelectorAll('[data-bots]').forEach(b => b.onclick = () => { sync(); d.play.bots = +b.dataset.bots; render(); });
+  document.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { sync(); d.play.learn = b.dataset.learn === 'true'; render(); });
   document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { sync(); d.play.level = b.dataset.level; render(); });
   $('#plStart').onclick = () => {
     sync();
@@ -349,7 +359,7 @@ function renderPlaySetup() {
       taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
     });
     const players = [meP, ...bots];
-    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, bots: bots.map(b => b.id), hand: null } };
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);
     S.lastCfg = Object.assign({}, d.cfg);
     playSel = null; keepAwake(); render();
