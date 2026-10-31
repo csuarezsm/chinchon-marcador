@@ -212,7 +212,7 @@ tr.hand:active td{background:var(--card2)}
   .pt-acts button{padding:10px 6px}
 }
 .pt-hand.mini{justify-content:flex-start;margin-top:6px}
-.pt-info{text-align:center;color:var(--mut);font-size:calc(13px * var(--fs, 1));margin:10px 0}
+.pt-info{text-align:center;color:var(--mut);font-size:calc(13px * min(var(--fs, 1), 1.1));margin:10px 0}
 .pt-acts{display:flex;gap:8px}
 .pt-acts button{flex:1;padding:14px 6px}
 .pc-card{position:relative;width:min(13vw, 58px);aspect-ratio:5/8;padding:0;border-radius:8px;background:#fbf7ec;border:2px solid #d8d0bc;color:#1d1d1d;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3px 0 6px;transition:transform .12s;flex:none;font-size:calc(17px * var(--fs, 1))}
@@ -225,12 +225,13 @@ tr.hand:active td{background:var(--card2)}
 .pc-j{color:#7d3c98}.pc-card.joker{background:#f6effa}
 .pc-o{color:#a87400}.pc-c{color:#b03024}.pc-e{color:#22508f}.pc-b{color:#2e7d32}
 .pc-s{width:62%;display:block}.pc-s svg{width:100%;height:auto;display:block}
-.pc-new{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--on-gold);font-style:normal;font-size:10px;font-weight:800;border-radius:6px;padding:0 4px;line-height:1.5}
+.pc-new{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--gold);border:2px solid var(--bg);font-size:0;color:transparent;overflow:hidden;padding:0;z-index:1}
+.pc-card.fresh{box-shadow:0 0 0 2px var(--gold)}
 .pc-card.tip{border-color:var(--gold);border-style:dashed;box-shadow:0 0 0 3px rgba(232,184,74,.35)}
 .pt-btn.tip .pc-card{animation:tipPulse 1.2s ease-in-out infinite}
 @keyframes tipPulse{50%{box-shadow:0 0 0 7px rgba(232,184,74,.45)}}
 .pt-early{color:var(--gold)}
-.pt-learn{background:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:calc(12px * var(--fs, 1));color:var(--mut);margin-left:4px}
+.pt-learn{background:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--mut);margin-left:4px}
 .pc-m{position:absolute;left:6px;right:6px;bottom:2px;height:4px;border-radius:2px;background:var(--mc)}
 .empty{text-align:center;color:var(--mut);padding:20px}
 </style>
@@ -299,7 +300,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {

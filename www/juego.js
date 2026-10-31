@@ -115,11 +115,13 @@ function dealHand(g) {
   usePlayRules(g);
   const deck = newDeck(g.play.jokers), hands = {};
   order.forEach(pid => (hands[pid] = deck.splice(0, 7)));
-  g.play.hand = { dealer: R.next, order, hands, deck, discard: [deck.shift()], turn: order[0], phase: 'draw', turns: 0, log: pname(g, R.next) + ' ha repartido. Sale ' + pname(g, order[0]) + '.', result: null };
+  g.play.hand = { dealer: R.next, order, hands, deck, discard: [deck.shift()], gone: [], took: {}, turn: order[0], phase: 'draw', turns: 0, log: pname(g, R.next) + ' ha repartido. Sale ' + pname(g, order[0]) + '.', result: null };
 }
-function drawFrom(h, src) {
-  if (src === 'discard' && h.discard.length) return h.discard.pop();
-  if (!h.deck.length) { const top = h.discard.pop(); h.deck = h.discard.sort(() => Math.random() - .5); h.discard = [top]; }
+function drawFrom(h, src, pid) {
+  h.gone = h.gone || []; h.took = h.took || {};
+  if (h.gone.length === 0 && h.discard.length) h.gone.push(...h.discard);
+  if (src === 'discard' && h.discard.length) { const c = h.discard.pop(); (h.took[pid] = h.took[pid] || []).push(c); return c; }
+  if (!h.deck.length) { const top = h.discard.pop(); h.deck = h.discard.sort(() => Math.random() - .5); h.discard = [top]; h.gone = [top]; }
   return h.deck.shift();
 }
 // Vuelta actual (1 = la primera, en la que todos juegan una vez) y si ya se puede cerrar
@@ -152,8 +154,66 @@ function closeHand(g, closer, discardId) {
 }
 
 /* ---------- La máquina ---------- */
+/* ---------- Nivel difícil ----------
+   Recuerda lo que ha salido, valora qué cartas sueltas aún pueden ligarse,
+   evita dar al siguiente lo que está buscando y elige cuándo cerrar. */
+const HARD = { hope: 0.05, wait: false, dangerW: 0.3, drawGain: 99, closeAt: 5 };   // ajustado con 2.000 partidas simuladas   // ajustes del nivel difícil
+function outsFor(id, rest, known) {
+  const c = card(id); if (c.joker) return 6;
+  let o = 0;
+  const same = SUITS.filter(s => s !== c.s).map(s => s + c.r);
+  const free = same.filter(x => !known.has(x)).length, pair = same.some(x => rest.includes(x));
+  o += pair ? free : free * 0.4;
+  const i = RANK_IDX[c.r];
+  for (const d of [-2, -1, 1, 2]) {
+    const j = i + d; if (j < 0 || j >= RANKS.length) continue;
+    const nb = c.s + RANKS[j]; if (known.has(nb)) continue;
+    const near = rest.some(x => x !== id && !isJoker(x) && card(x).s === c.s && Math.abs(RANK_IDX[card(x).r] - i) <= 2);
+    o += (Math.abs(d) === 1 ? 1 : 0.5) * (near ? 1 : 0.5);
+  }
+  return o;
+}
+function hardEval(rest, known) {
+  const bm = bestMelds(rest);
+  let hope = 0;
+  for (const id of bm.loose) hope += cardValue(card(id)) * Math.min(1, outsFor(id, rest, known) / 3);
+  return { bm, val: bm.dead - HARD.hope * hope };
+}
+function danger(h, d, pid) {
+  if (isJoker(d)) return 99;
+  const i = h.order.indexOf(pid), next = h.order[(i + 1) % h.order.length], c = card(d);
+  let x = 0;
+  for (const t of (h.took && h.took[next]) || []) {
+    if (isJoker(t)) continue;
+    const tc = card(t);
+    if (tc.r === c.r) x += 6; else if (tc.s === c.s && Math.abs(RANK_IDX[tc.r] - RANK_IDX[c.r]) <= 2) x += 4;
+  }
+  return x;
+}
+function hardDiscard(h, hand, pid) {
+  const known = new Set([...hand, ...(h.gone || [])]);
+  let best = null;
+  for (const d of hand) {
+    const rest = hand.filter(x => x !== d), ev = hardEval(rest, known);
+    const sc = ev.val + danger(h, d, pid) * HARD.dangerW + (isChinchon(rest) ? -1000 : 0) - cardValue(card(d)) * 0.01;
+    if (!best || sc < best.sc) best = { discard: d, rest, bm: ev.bm, sc };
+  }
+  return best;
+}
+function hardWantsClose(g, h, pid, bd) {
+  const R = compute(g), lim = g.cfg.limit;
+  if (bd.bm.dead === 0) return true;                                   // −10 o chinchón
+  if (bd.bm.dead <= HARD.closeAt || roundOf(h) >= 4 || h.deck.length < 6) return true;
+  if (h.order.some(o => o !== pid && R.st[o].total >= lim - 20)) return true;   // alguien está a punto de pasarse
+  if (R.st[pid].total >= lim - 25) return true;                        // protegerse
+  const loose = bd.bm.loose, known = new Set([...h.hands[pid], ...(h.gone || [])]);
+  if (HARD.wait && loose.length === 1 && outsFor(loose[0], bd.rest, known) >= 2) return false;   // esperar al −10
+  return true;
+}
+
 function botStep(g) {
   usePlayRules(g);
+  if (g.play.level === 'dificil') return hardStep(g);
   const h = g.play.hand, pid = h.turn, easy = g.play.level === 'facil';
   const hand = h.hands[pid];
   if (h.phase === 'draw') {
@@ -163,7 +223,7 @@ function botStep(g) {
       const now = bestMelds(hand).dead, withTop = bestDiscard([...hand, top]);
       if (withTop.discard !== top && withTop.bm.dead < now - (easy ? 3 : 0)) src = 'discard';
     }
-    const got = drawFrom(h, src);
+    const got = drawFrom(h, src, pid);
     hand.push(got);
     h.phase = 'discard';
     h.log = pname(g, pid) + (src === 'discard' ? ' coge ' + theCard(card(got)) + ' del descarte.' : ' roba del mazo.');
@@ -177,10 +237,37 @@ function botStep(g) {
   const wantClose = canClose && (easy ? best.bm.dead <= 2 || h.turns > 40 : true);
   h.hands[pid] = best.rest;
   if (wantClose) { closeHand(g, pid, best.discard); h.log = pname(g, pid) + ' cierra' + (g.play.hand.result.kind === 'chinchon' ? ' ¡con CHINCHÓN!' : g.play.hand.result.kind === 'bonus' ? ' con todo ligado.' : '.'); return; }
-  h.discard.push(best.discard);
+  h.discard.push(best.discard); (h.gone = h.gone || []).push(best.discard);
   h.log += ' Tira ' + theCard(card(best.discard)) + '.';
   nextTurn(h);
   if (h.turns > 400) closeHand(g, null, null);                // por seguridad: nadie cierra
+}
+function hardStep(g) {
+  const h = g.play.hand, pid = h.turn, hand = h.hands[pid];
+  if (h.phase === 'draw') {
+    const top = h.discard[h.discard.length - 1];
+    let src = 'deck';
+    if (top) {
+      const known = new Set([...hand, ...(h.gone || [])]);
+      const now = hardEval(hand, known), wt = hardDiscard(h, [...hand, top], pid);
+      if (wt.discard !== top && (wt.bm.dead < now.bm.dead || wt.sc < now.val - HARD.drawGain)) src = 'discard';
+    }
+    const got = drawFrom(h, src, pid);
+    hand.push(got); h.phase = 'discard';
+    h.log = pname(g, pid) + (src === 'discard' ? ' coge ' + theCard(card(got)) + ' del descarte.' : ' roba del mazo.');
+    return;
+  }
+  const bd = bestDiscard(hand);
+  if (bd.bm.dead <= CLOSE_MAX && canCloseNow(g) && hardWantsClose(g, h, pid, bd)) {
+    h.hands[pid] = bd.rest; closeHand(g, pid, bd.discard);
+    h.log = pname(g, pid) + ' cierra' + (h.result.kind === 'chinchon' ? ' ¡con CHINCHÓN!' : h.result.kind === 'bonus' ? ' con todo ligado.' : '.');
+    return;
+  }
+  const best = hardDiscard(h, hand, pid);
+  h.hands[pid] = best.rest; h.discard.push(best.discard); (h.gone = h.gone || []).push(best.discard);
+  h.log += ' Tira ' + theCard(card(best.discard)) + '.';
+  nextTurn(h);
+  if (h.turns > 400) closeHand(g, null, null);
 }
 // Juega sin pausas hasta que le toque a la persona o termine la mano
 function runBotsInstant(g) { let k = 0; while (g.play.hand && g.play.hand.phase !== 'over' && isBot(g, g.play.hand.turn) && k++ < 2000) botStep(g); }
@@ -198,9 +285,9 @@ function cardHtml(id, opts) {
   if (!id) return '<div class="pc-card empty"></div>';
   const c = card(id), tag = opts.data ? 'button' : 'div';   // solo las cartas de tu mano son botones
   if (c.joker) return `<${tag} class="pc-card joker ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="comodín" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
-    <b class="pc-r pc-j">★</b><span class="pc-s"><svg viewBox="0 0 24 24"><path d="M12 2l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.6 8.8l6.8-.5z" fill="#7d3c98"/></svg></span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new">nueva</em>' : ''}</${tag}>`;
-  return `<${tag} class="pc-card ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="${cardName(c)}" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
-    <b class="pc-r pc-${c.s}">${RANK_LABEL(c.r)}</b><span class="pc-s">${SUIT_SVG[c.s]}</span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new">nueva</em>' : ''}</${tag}>`;
+    <b class="pc-r pc-j">★</b><span class="pc-s"><svg viewBox="0 0 24 24"><path d="M12 2l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.6 8.8l6.8-.5z" fill="#7d3c98"/></svg></span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new" title="Carta nueva">nueva</em>' : ''}</${tag}>`;
+  return `<${tag} class="pc-card ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.isNew ? 'fresh' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="${cardName(c)}" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
+    <b class="pc-r pc-${c.s}">${RANK_LABEL(c.r)}</b><span class="pc-s">${SUIT_SVG[c.s]}</span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new" title="Carta nueva">nueva</em>' : ''}</${tag}>`;
 }
 function backHtml(n) { return `<div class="pc-card back"><span>${n != null ? n : ''}</span></div>`; }
 // Ordena la mano: primero lo ligado (por combinación) y luego lo suelto
@@ -282,7 +369,7 @@ function renderTable(g, R) {
 function humanDraw(g, src) {
   const h = g.play.hand, my = me(g);
   if (h.turn !== my || h.phase !== 'draw') return;
-  const got = drawFrom(h, src);
+  const got = drawFrom(h, src, my);
   h.hands[my].push(got); h.phase = 'discard'; playSel = null; h.fresh = got;
   h.log = 'Has ' + (src === 'discard' ? 'cogido ' : 'robado ') + theCard(card(got)) + '.';
   vibrate(15); save(); render();
@@ -294,7 +381,7 @@ function humanDiscard(g, close) {
   h.hands[my] = h.hands[my].filter(x => x !== d);
   if (close) { if (!canCloseNow(g)) { h.hands[my].push(d); toast('Aún no se puede cerrar: desde la ' + closeFrom(g) + 'ª vuelta'); return; }
     if (bestMelds(h.hands[my]).dead > CLOSE_MAX) { h.hands[my].push(d); toast('Para cerrar necesitas ' + CLOSE_MAX + ' o menos sin ligar'); return; } closeHand(g, my, d); h.log = 'Has cerrado.'; }
-  else { h.discard.push(d); h.log = 'Has tirado ' + theCard(card(d)) + '.'; nextTurn(h); }
+  else { h.discard.push(d); (h.gone = h.gone || []).push(d); h.log = 'Has tirado ' + theCard(card(d)) + '.'; nextTurn(h); }
   vibrate(20); save(); render();
 }
 function showHandResult(g) {
@@ -349,7 +436,7 @@ function renderPlaySetup() {
       <label class="f"><span>★ Comodines<em>Sustituyen a cualquier carta</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[0, 'Sin'], [2, '2 comodines']].map(([k, l]) => `<button data-jokers="${k}" class="${(d.play.jokers || 0) === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>0 = no suma y se puede cerrar con él suelto</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
       <label class="f"><span>💡 Modo aprendizaje<em>La app te sugiere qué robar, qué tirar y cuándo cerrar</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[false, 'No'], [true, 'Sí']].map(([k, l]) => `<button data-learn="${k}" class="${!!d.play.learn === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
-      <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
+      <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal'], ['dificil', 'Difícil']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas${d.play.jokers ? ' y ' + d.play.jokers + ' comodines' : ''}, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar, desde la ${d.play.closeFrom || 2}ª vuelta; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>

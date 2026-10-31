@@ -255,6 +255,13 @@ console.log('Juego contra la máquina');
     }
     return { bad, hands, ended, jokerPlays };
   });
+  const duel = await p.evaluate(() => { let wa = 0, N = 600, bad = 0;
+    for (let k = 0; k < N; k++) { const ps = [{ id: 'a' + k, name: 'A' }, { id: 'b' + k, name: 'B' }]; if (k % 2) ps.reverse();
+      const g = { id: uid(), created: 1, cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: 'normal', jokers: k % 3 ? 0 : 2, jokerValue: 0, closeFrom: 2, bots: ps.map(x => x.id), hand: null } };
+      let guard = 0; while (!compute(g).ended && guard++ < 300) { dealHand(g); let n = 0; while (g.play.hand.phase !== 'over' && n++ < 3000) { g.play.level = g.play.hand.turn.startsWith('a') ? 'dificil' : 'normal'; botStep(g); } }
+      const R = compute(g); if (!R.ended) bad++; else if (R.ended.winner.startsWith('a')) wa++; }
+    return { pct: Math.round(wa / N * 1000) / 10, bad }; });
+  check(`el nivel difícil gana al normal (${duel.pct} % de 600 partidas)`, duel.bad === 0 && duel.pct > 50, JSON.stringify(duel));
   check(`60 partidas con comodines sin errores (${simJ.hands} manos)`, simJ.bad === 0 && simJ.ended === 60, JSON.stringify(simJ));
   check(`150 partidas simuladas sin errores (${sim.hands} manos)`, sim.bad === 0, JSON.stringify(sim));
   check('todas las partidas simuladas terminan', sim.ended === sim.games, JSON.stringify(sim));
