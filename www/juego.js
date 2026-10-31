@@ -16,6 +16,7 @@ const RANK_LABEL = r => ({ 10: 'S', 11: 'C', 12: 'R' })[r] || String(r);
 const RANK_NAME = r => ({ 1: 'as', 10: 'sota', 11: 'caballo', 12: 'rey' })[r] || String(r);
 const CLOSE_MAX = 5;                                          // se cierra con 5 o menos sin ligar
 const BOTS = ['Paco', 'Lola', 'Manolo'];
+const CARD_SIZES = [['1', 'normales'], ['1.25', 'grandes'], ['1.5', 'muy grandes']];
 const BOT_IDEAS = ['Pancho', 'Chano', 'Candelaria', 'Tomasa', 'Juanillo', 'Nieves', 'Pepito', 'Carmela', 'Domingo', 'Fefa', 'Agustín', 'Chona', 'Ramón', 'Pino', 'Chicho', 'Luci'];
 
 const card = id => ({ id, s: id[0], r: Number(id.slice(1)) });
@@ -227,7 +228,8 @@ function renderTable(g, R) {
     ? `💡 Puedes <b>cerrar</b> tirando <b>${theCard(card(tip.discard))}</b> (te quedan ${tip.dead}).`
     : `💡 Tira <b>${theCard(card(tip.discard))}</b>. Te quedarían ${tip.dead} sin ligar; para cerrar hacen falta ${CLOSE_MAX} o menos.`;
   else hint = playSel ? (canClose ? 'Puedes <b>tirar</b> esta carta o <b>cerrar</b> la mano.' : 'Toca <b>Tirar</b> para descartar esta carta.') : 'Elige la carta que quieres tirar.';
-  $('#app').innerHTML = `
+  const cs = CARD_SIZES.find(x => x[0] === String(S.cardScale || '1')) || CARD_SIZES[0];
+  $('#app').innerHTML = `<div class="pt-table" style="--cs:${cs[0]}"><div class="pt-l">
     <div class="pt-opps">${opp.map(p => `<div class="pt-opp ${h.turn === p.id && h.phase !== 'over' ? 'turn' : ''}">
         <div class="pt-on">${esc(p.name)}</div><div class="pt-ot">${R.st[p.id].total} pts</div>
         <div class="pt-ob">${'<i></i>'.repeat(Math.min(8, (h.hands[p.id] || []).length))}</div></div>`).join('')}</div>
@@ -235,19 +237,20 @@ function renderTable(g, R) {
       <div class="pt-pile"><button class="pt-btn ${tip && tip.draw === 'deck' ? 'tip' : ''}" id="pDeck" ${myTurn && h.phase === 'draw' ? '' : 'disabled'}>${backHtml(h.deck.length)}</button><small>Mazo</small></div>
       <div class="pt-pile"><button class="pt-btn ${tip && tip.draw === 'discard' ? 'tip' : ''}" id="pDisc" ${myTurn && h.phase === 'draw' && top ? '' : 'disabled'}>${top ? cardHtml(top) : cardHtml(null)}</button><small>Descarte</small></div>
     </div>
-    <div class="pt-log">${esc(h.log || '')}</div>
+    <div class="pt-log">${esc(h.log || '')}</div></div><div class="pt-r">
     <div class="pt-hint">${hint}</div>
-    ${arr ? `<div class="pt-hand">${arr.ids.map(id => cardHtml(id, { sel: id === playSel, meld: learn ? arr.meldOf[id] : null, tip: tip && tip.discard === id, isNew: myTurn && h.phase === 'discard' && id === h.fresh, data: `data-card="${id}"` })).join('')}</div>
-    <div class="pt-info">${learn ? `Sin ligar: <b>${arr.bm.dead}</b> pts · ` : ''}Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo · <button class="pt-learn" id="pLearn">💡 Aprendizaje: ${learn ? 'sí' : 'no'}</button></div>
+    ${arr ? `<div class="pt-hand ${cs[0] !== '1' ? 'big' : ''}">${arr.ids.map(id => cardHtml(id, { sel: id === playSel, meld: learn ? arr.meldOf[id] : null, tip: tip && tip.discard === id, isNew: myTurn && h.phase === 'discard' && id === h.fresh, data: `data-card="${id}"` })).join('')}</div>
+    <div class="pt-info">${learn ? `Sin ligar: <b>${arr.bm.dead}</b> pts · ` : ''}Llevas <b>${R.st[my].total}</b> · ${h.deck.length} en el mazo · <button class="pt-learn" id="pLearn">💡 Aprendizaje: ${learn ? 'sí' : 'no'}</button> <button class="pt-learn" id="pSize">🔍 Cartas: ${cs[1]}</button></div>
     <div class="pt-acts">
       <button class="btn-ghost" id="pScore">📋 Puntos</button>
       <button class="btn-gold" id="pDrop" ${myTurn && h.phase === 'discard' && playSel ? '' : 'disabled'}>Tirar</button>
       <button class="btn-red" id="pClose" ${canClose ? '' : 'disabled'}>Cerrar${selDead ? ' (' + (isChinchon(h.hands[my].filter(x => x !== playSel)) ? '★' : selDead.dead === 0 ? g.cfg.closeBonus : selDead.dead) + ')' : ''}</button>
-    </div>` : `<div class="pt-acts"><button class="btn-ghost" id="pScore">📋 Puntos</button></div>`}`;
+    </div>` : `<div class="pt-acts"><button class="btn-ghost" id="pScore">📋 Puntos</button></div>`}</div></div>`;
   const deckB = $('#pDeck'), discB = $('#pDisc');
   if (deckB) deckB.onclick = () => humanDraw(g, 'deck');
   if (discB) discB.onclick = () => humanDraw(g, 'discard');
   document.querySelectorAll('[data-card]').forEach(b => b.onclick = () => { if (!myTurn || h.phase !== 'discard') return; playSel = playSel === b.dataset.card ? null : b.dataset.card; vibrate(8); render(); });
+  const sz = $('#pSize'); if (sz) sz.onclick = () => { const i = CARD_SIZES.indexOf(cs); S.cardScale = CARD_SIZES[(i + 1) % CARD_SIZES.length][0]; save(); render(); };
   const lb = $('#pLearn'); if (lb) lb.onclick = () => { g.play.learn = !g.play.learn; S.draft.play && (S.draft.play.learn = g.play.learn); save(); toast(g.play.learn ? '💡 Modo aprendizaje activado' : 'Modo aprendizaje desactivado'); render(); };
   const drop = $('#pDrop'); if (drop) drop.onclick = () => humanDiscard(g, false);
   const cl = $('#pClose'); if (cl) cl.onclick = () => confirmBox('Cerrar la mano', `Tiras ${theCard(card(playSel))} y enseñas tus cartas.`, 'Cerrar', () => humanDiscard(g, true));

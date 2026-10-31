@@ -191,6 +191,26 @@ tr.hand:active td{background:var(--card2)}
 .pt-hand{display:flex;justify-content:center;gap:4px;flex-wrap:nowrap}
 .pt-hand:not(.mini) .pc-card{flex:1 1 0;min-width:0;width:auto;max-width:58px}
 .pt-hand:not(.mini) .pc-s{width:70%}
+.pt-hand.big{flex-wrap:wrap;row-gap:10px}
+.pt-hand.big .pc-card{flex:none;width:calc(58px * var(--cs));max-width:none;font-size:calc(17px * var(--cs) * var(--fs, 1))}
+.pt-pile .pc-card{width:calc(64px * var(--cs, 1));font-size:calc(22px * var(--cs, 1))}
+@media (orientation: landscape) and (max-height: 600px) {
+  header{padding-top:calc(4px + env(safe-area-inset-top));padding-bottom:4px}
+  body:has(.pt-table) header h1 small{display:none}
+  main:has(.pt-table){max-width:none;padding:8px 14px}
+  .pt-table{display:grid;grid-template-columns:minmax(0, 30%) minmax(0, 1fr);gap:14px;align-items:start}
+  .pt-opps{flex-direction:column;gap:6px;margin-bottom:8px}
+  .pt-opp{padding:5px 10px;display:flex;align-items:center;gap:8px}
+  .pt-opp .pt-ob{display:none}
+  .pt-on{flex:1}
+  .pt-mid{margin:4px 0}
+  .pt-pile .pc-card{width:calc(52px * var(--cs, 1))}
+  .pt-hint{margin:2px 0 8px}
+  .pt-hand .pc-card,.pt-hand.big .pc-card{flex:1 1 0;width:auto;min-width:0;max-width:calc(74px * var(--cs, 1))}
+  .pt-hand.big{flex-wrap:nowrap}
+  .pt-info{margin:8px 0}
+  .pt-acts button{padding:10px 6px}
+}
 .pt-hand.mini{justify-content:flex-start;margin-top:6px}
 .pt-info{text-align:center;color:var(--mut);font-size:calc(13px * var(--fs, 1));margin:10px 0}
 .pt-acts{display:flex;gap:8px}
@@ -262,6 +282,8 @@ function openThemes() {
   const cur = S.theme || 'tapete';
   openModal(`<h3>🔠 Tamaño de letra</h3>
     <div class="kinds" style="margin:6px 0 16px">${FONT_SIZES.map(([v, l]) => `<button data-fs="${v}" class="${String(S.fontScale || '1') === v ? 'on' : ''}" style="font-size:${13 * parseFloat(v)}px">${l}</button>`).join('')}</div>
+    <h3>🃏 Tamaño de las cartas</h3>
+    <div class="kinds" style="margin:6px 0 16px">${CARD_SIZES.map(([v, l]) => `<button data-cs="${v}" class="${String(S.cardScale || '1') === v ? 'on' : ''}">${l.charAt(0).toUpperCase() + l.slice(1)}</button>`).join('')}</div>
     <h3>🎨 Colores</h3><div class="sub">Toca un tema y se aplica al momento.</div>
     <div class="themes">${Object.entries(THEMES).map(([k, t]) => `
       <button class="th ${k === cur ? 'on' : ''}" data-theme="${k}" style="background:${t.card}">
@@ -270,11 +292,12 @@ function openThemes() {
       </button>`).join('')}</div>
     <div class="acts"><button class="btn-gold" id="thOk">Listo</button></div>`);
   document.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { S.theme = b.dataset.theme; applyTheme(S.theme); save(); openThemes(); });
+  document.querySelectorAll('[data-cs]').forEach(b => b.onclick = () => { S.cardScale = b.dataset.cs; save(); openThemes(); });
   document.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => { S.fontScale = b.dataset.fs; applyFont(); save(); openThemes(); });
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -1419,7 +1442,7 @@ $('#menuBtn').onclick = () => {
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
       ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
-      <button id="mTheme">🎨 Colores y tamaño de letra</button>
+      <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button id="mHelp">❓ Cómo se usa</button>
       <button id="mWipe">🗑 Borrar datos…</button>
@@ -1435,7 +1458,7 @@ $('#menuBtn').onclick = () => {
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
       ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
-      <button id="mTheme">🎨 Colores y tamaño de letra</button>
+      <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mHelp">❓ Cómo se usa</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
