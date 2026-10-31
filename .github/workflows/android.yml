@@ -29,11 +29,13 @@ jobs:
           else
             echo "::error::Faltan los secretos ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD"; exit 1
           fi
-      - name: Compilar APK
+      - name: Compilar APK (GitHub) y AAB (Google Play)
         working-directory: android
         env: { ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" }
-        run: chmod +x gradlew && ./gradlew assembleRelease
-      - run: cp android/app/build/outputs/apk/release/app-release.apk chinchon.apk
+        run: chmod +x gradlew && ./gradlew assembleGithubRelease bundlePlayRelease
+      - run: |
+          cp android/app/build/outputs/apk/github/release/app-github-release.apk chinchon.apk
+          cp android/app/build/outputs/bundle/playRelease/app-play-release.aab chinchon-play.aab
       - name: Publicar versión
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
@@ -42,6 +44,6 @@ jobs:
           # Una versión ya publicada no se vuelve a crear: así se conserva su contador de descargas
           if gh release view "v$V" >/dev/null 2>&1; then echo "La v$V ya está publicada; sube versionName para publicar otra."; exit 0; fi
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create "v$V" chinchon.apk --latest --title "Chinchón v$V" --notes "$(git log -1 --pretty=%s)
+          gh release create "v$V" chinchon.apk chinchon-play.aab --latest --title "Chinchón v$V" --notes "$(git log -1 --pretty=%s)
 
           © 2026 IT Canarias"

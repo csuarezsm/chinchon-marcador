@@ -307,6 +307,22 @@ console.log('Juego contra la máquina');
   await ctx.close();
 }
 
+// Versión de Google Play: sin actualizador propio ni donativos
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, serviceWorkers: 'block' });
+  const p = await ctx.newPage(); const errors = []; p.on('pageerror', e => errors.push(e.message));
+  await p.addInitScript(() => { localStorage.setItem('chinchon.v1', JSON.stringify({ onboarded: true, updAvail: { v: '99.0.0', url: 'x' } }));
+    window.Capacitor = { isNativePlatform: () => false, Plugins: { AppUpdater: { info: async () => ({ store: 'play' }), setSystemBars: async () => {} } } }; });
+  await p.goto(URL_APP); await p.waitForTimeout(200);
+  await p.click('#menuBtn');
+  check('Play: el menú no ofrece actualizar', !(await p.$('#mUpd')));
+  await p.click('#mAbout');
+  check('Play: sin donativo en Acerca de', !(await p.$('#donate')) && /Google Play/.test(await p.textContent('#modal')));
+  check('Play: compartir enlaza a Google Play', await p.evaluate(() => isPlay() && !hasUpd()));
+  check('Play: sin errores de JavaScript', !errors.length, errors.join(' | '));
+  await ctx.close();
+}
+
 await browser.close(); server.close();
 console.log(`\n${passed} correctas, ${failed} fallidas`);
 process.exit(failed ? 1 : 0);

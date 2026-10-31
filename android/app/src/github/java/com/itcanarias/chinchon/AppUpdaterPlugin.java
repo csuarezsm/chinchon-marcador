@@ -1,10 +1,6 @@
 package com.itcanarias.chinchon;
 
 import android.content.Intent;
-import android.graphics.Color;
-import android.view.View;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -32,24 +28,17 @@ import java.net.URL;
 @CapacitorPlugin(name = "AppUpdater")
 public class AppUpdaterPlugin extends Plugin {
 
-    /** Color de fondo detrás de las barras del sistema (según el tema de colores de la app). */
+    /** Versión distribuida fuera de Google Play (GitHub): lleva su propio actualizador. */
+    @PluginMethod
+    public void info(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("store", "github");
+        call.resolve(r);
+    }
+
     @PluginMethod
     public void setSystemBars(PluginCall call) {
-        final String color = call.getString("color", "#0b2a20");
-        final boolean light = Boolean.TRUE.equals(call.getBoolean("light", false));
-        getActivity().runOnUiThread(() -> {
-            try {
-                int c = Color.parseColor(color);
-                View decor = getActivity().getWindow().getDecorView();
-                decor.setBackgroundColor(c);
-                WindowInsetsControllerCompat ctl = WindowCompat.getInsetsController(getActivity().getWindow(), decor);
-                ctl.setAppearanceLightStatusBars(light);
-                ctl.setAppearanceLightNavigationBars(light);
-                call.resolve();
-            } catch (Exception e) {
-                call.reject("Color no válido");
-            }
-        });
+        SystemBars.apply(getActivity(), call);
     }
 
     @PluginMethod

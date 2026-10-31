@@ -315,7 +315,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.7.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -634,6 +634,13 @@ function finalScores(g, R) {
     .sort((a, b) => (R.st[a.id].out - R.st[b.id].out) || (R.st[a.id].total - R.st[b.id].total))
     .map(p => { const st = R.st[p.id]; return `<div class="top" style="padding:4px 0"><div class="n">${R.ended && R.ended.winner === p.id ? '🏆 ' : ''}${esc(p.name)}${st.rebuys ? ' <small style="display:inline">↻' + st.rebuys + '</small>' : ''}</div><b style="${st.out ? 'color:var(--red)' : ''}">${st.total}</b></div>`; }).join('') + '</div>';
 }
+/* ---------- Tienda: GitHub (actualizador propio) o Google Play ---------- */
+let STORE = 'github';
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.itcanarias.chinchon';
+const storeReady = (async () => {
+  try { const U = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater; if (U && U.info) { const r = await U.info(); if (r && r.store === 'play') STORE = 'play'; } } catch (e) {}
+})();
+const isPlay = () => STORE === 'play';
 /* ---------- Actualizaciones ---------- */
 function cmpVer(a, b) { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; }
 async function checkUpdates(manual) {
@@ -659,7 +666,7 @@ async function checkUpdates(manual) {
     if (manual) showUpdMsg('No se pudo comprobar. Revisa que tengas conexión a internet.', '⚠️');
   }
 }
-function hasUpd() { return !!(S.updAvail && cmpVer(S.updAvail.v, APP_VERSION) > 0); }
+function hasUpd() { return !isPlay() && !!(S.updAvail && cmpVer(S.updAvail.v, APP_VERSION) > 0); }
 function openUpdAvail() { if (hasUpd()) showUpdate(S.updAvail.v, S.updAvail.url, S.updAvail.page, S.updAvail.note); }
 function refreshUpdBadge() {
   const on = hasUpd();
@@ -668,7 +675,9 @@ function refreshUpdBadge() {
   b.classList.toggle('on', on);
   if (on) b.innerHTML = `🎉 Nueva versión v${esc(S.updAvail.v)} disponible · <u>Actualizar</u>`;
 }
-function autoCheckUpdates() {
+async function autoCheckUpdates() {
+  await storeReady;
+  if (isPlay()) { if (S.updAvail) { S.updAvail = null; save(); refreshUpdBadge(); } return; }
   if (!isNative() || !navigator.onLine) return;
   if (!S.lastUpdateCheck || Date.now() - S.lastUpdateCheck > 3600e3) checkUpdates(false);
 }
@@ -816,7 +825,9 @@ function openWelcome(i) {
 /* ---------- Compartir la app ---------- */
 const APK_URL = 'https://github.com/' + REPO + '/releases/latest/download/chinchon.apk';
 async function shareApp() {
-  const text = '🃏 Chinchón · Marcador — lleva los puntos del chinchón en el móvil: manos, reenganches, ranking y jornadas. Gratis y sin anuncios.\n\nDescárgala para Android aquí:\n' + APK_URL + '\n\n(Al abrir el archivo, Android puede pedir permiso para instalar apps de fuera de Google Play.)';
+  const text = isPlay()
+    ? '🃏 Chinchón — lleva los puntos del chinchón en el móvil y juega contra la máquina. Gratis y sin anuncios.\n\nDescárgala en Google Play:\n' + PLAY_URL
+    : '🃏 Chinchón · Marcador — lleva los puntos del chinchón en el móvil: manos, reenganches, ranking y jornadas. Gratis y sin anuncios.\n\nDescárgala para Android aquí:\n' + APK_URL + '\n\n(Al abrir el archivo, Android puede pedir permiso para instalar apps de fuera de Google Play.)';
   try {
     if (isNative()) { await window.Capacitor.Plugins.Share.share({ title: 'Chinchón · Marcador', text, dialogTitle: 'Compartir la app' }); return; }
     if (navigator.share) { await navigator.share({ title: 'Chinchón · Marcador', text }); return; }
@@ -1459,7 +1470,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
-      ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
+      ${isPlay() ? '' : hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button id="mHelp">❓ Cómo se usa</button>
@@ -1475,7 +1486,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mShareApp">📲 Compartir la app</button>
       <button id="mRoster">👥 Jugadores habituales</button>
-      ${hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
+      ${isPlay() ? '' : hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mHelp">❓ Cómo se usa</button>
       <button id="mAbout">ℹ️ Acerca de</button>
@@ -1497,17 +1508,17 @@ $('#menuBtn').onclick = () => {
         <div class="mut" style="margin-top:8px;line-height:1.5">
         • Tus partidas, jugadores y ajustes se guardan <b>solo en este móvil</b>. No hay cuentas ni registro.<br>
         • La app <b>no recoge ningún dato personal</b> ni de uso, y no lleva anuncios ni rastreadores.<br>
-        • Solo se conecta a internet para <b>buscar actualizaciones</b> en GitHub (no envía ningún dato tuyo; como cualquier web, GitHub ve la dirección IP de la conexión) y, si tú lo pulsas, para abrir PayPal o compartir.<br>
+        ${isPlay() ? '• La app <b>no necesita internet</b> para funcionar ni envía ningún dato. Las actualizaciones llegan por Google Play.<br>' : '• Solo se conecta a internet para <b>buscar actualizaciones</b> en GitHub (no envía ningún dato tuyo; como cualquier web, GitHub ve la dirección IP de la conexión) y, si tú lo pulsas, para abrir PayPal o compartir.<br>'}
         • La copia de seguridad automática se queda en el móvil; Android puede incluirla en tu copia de Google si la tienes activada.<br>
         • Responsable: IT Canarias · itcanarias.com</div></details>
-      <div class="donate">
+      ${isPlay() ? '' : `<div class="donate">
         <div class="dt">💛 Apoya el desarrollo de esta app</div>
         <div class="dd">Es gratis y sin anuncios. Con 1&nbsp;€ nos ayudas a seguir mejorándola y a crear nuevas apps como esta. ¡Gracias!</div>
         <button class="btn-gold" id="donate">Apoyar con 1 € (PayPal)</button>
-      </div>
+      </div>`}
       <div class="acts"><button class="btn-ghost" id="ok">Cerrar</button></div>`);
     $('#ok').onclick = closeModal;
-    $('#donate').onclick = () => openExternal(DONATE_URL);
+    if ($('#donate')) $('#donate').onclick = () => openExternal(DONATE_URL);
   });
   on('mUndo', () => {
     const last = g.events[g.events.length - 1];
