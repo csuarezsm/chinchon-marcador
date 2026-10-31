@@ -91,6 +91,7 @@ function onArchivar(p) {
 
 /* ---------- Pantallas ---------- */
 function renderOnline() {
+  S.online = S.online || {};
   if (S.draft.mode === 'online' || ON.sala) { if (!ON.quiere) onConectar(); }
   const s = ON.sala;
   if (!s) return onRenderInicio();
