@@ -8,7 +8,7 @@ const { chinchon: E } = require('../src/motor.js');
 const S = require('../src/salas.js');
 
 let passed = 0, failed = 0;
-const check = (n, c, x = '') => { if (c) { passed++; console.log('  ✓ ' + n); } else { failed++; console.log('  ✗ ' + n + (x ? ' → ' + x : '')); } };
+const check = (n, c, x = '') => { if (c) { passed++; console.log('  ✓ ' + n); } else { failed++; console.log('  ✗ ' + n + (x ? ' → ' + x : '')); if (process.env.GITHUB_ACTIONS) console.log('::error::' + (n + (x ? ' → ' + x : '')).replace(/\n/g, ' ').slice(0, 900)); } };
 const espera = ms => new Promise(r => setTimeout(r, ms));
 
 const { server } = crearServidor();
