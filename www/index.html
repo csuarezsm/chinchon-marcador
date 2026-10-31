@@ -298,7 +298,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
@@ -1289,7 +1289,7 @@ function finishAndNew(rematch) {
     const order = g.players.map(p => p.id), i = order.indexOf(g.firstDealer);
     const players = g.players.map(p => ({ id: uid(), name: p.name }));
     S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, g.cfg), players, firstDealer: players[(i + 1) % players.length].id, events: [] };
-    if (g.play) S.game.play = { level: g.play.level, learn: !!g.play.learn, jokers: g.play.jokers || 0, jokerValue: g.play.jokerValue ?? 25, bots: g.players.map((p, k) => g.play.bots.includes(p.id) ? players[k].id : null).filter(Boolean), hand: null };
+    if (g.play) S.game.play = { level: g.play.level, learn: !!g.play.learn, jokers: g.play.jokers || 0, jokerValue: g.play.jokerValue ?? 0, bots: g.players.map((p, k) => g.play.bots.includes(p.id) ? players[k].id : null).filter(Boolean), hand: null };
   } else {
     S.draft.names = g.players.map(p => p.name); S.draft.cfg = Object.assign({}, g.cfg); S.draft.dealer = 0;
     S.game = null;

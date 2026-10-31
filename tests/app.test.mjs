@@ -211,27 +211,36 @@ console.log('Juego contra la máquina');
     }
     return { games, hands, bad, ended };
   });
-  const jk = await p.evaluate(() => ({
+  const jk = await p.evaluate(() => { JOKER_VALUE = 0; return ({
     group: bestMelds(['o5', 'c5', 'j1', 'b2', 'b3', 'b4', 'o1']).dead,          // 5-5-comodín + 2-3-4 de bastos, suelto el as
     gap: bestMelds(['c1', 'c2', 'j1', 'c4', 'o7', 'e7', 'b7']).dead,            // as-2-(comodín)-4 de copas + trío de 7
     two: bestMelds(['o5', 'o6', 'j1', 'j2', 'c1', 'e1', 'b1']).dead,            // 5-6 + 2 comodines + trío de ases
     loose: bestMelds(['j1', 'o1', 'c3', 'e5', 'b7', 'o10', 'c11']).dead,        // comodín con una sola carta no liga: vale 25
     alone: bestMelds(['j1', 'j2', 'o1', 'c3', 'e5', 'b7', 'o10']).dead,
     chin: isChinchon(['e1', 'e2', 'j1', 'e4', 'e5', 'e6', 'e7']),
-    disc: bestDiscard(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1', 'c12']).discard
-  }));
+    disc: bestDiscard(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1', 'c12']).discard,
+    closeLoose: bestDiscard(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1', 'c12']).bm.dead
+  }); });
   check('comodín completa un grupo', jk.group === 1, JSON.stringify(jk));
   check('comodín tapa un hueco en la escalera', jk.gap === 0);
   check('dos comodines con dos cartas forman escalera', jk.two === 0);
-  check('comodín suelto vale 25', jk.loose === 61, String(jk.loose));
-  check('los comodines necesitan al menos 2 cartas de verdad', jk.alone === 76, String(jk.alone));
+  check('comodín suelto vale 0', jk.loose === 36, String(jk.loose));
+  check('se puede cerrar con el comodín suelto', jk.closeLoose === 0, String(jk.closeLoose));
+  check('los comodines necesitan al menos 2 cartas de verdad', jk.alone === 26, String(jk.alone));
   check('el chinchón no vale con comodín', !jk.chin);
+  const bonus = await p.evaluate(() => {
+    const ps = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }];
+    const mk = hand => { const g = { id: uid(), created: 1, cfg: Object.assign({}, DEF_CFG), players: ps, firstDealer: 'a', events: [], play: { jokers: 2, jokerValue: 0, bots: ['b'], hand: { dealer: 'a', order: ['a', 'b'], hands: { a: hand, b: ['o1', 'c3', 'e5', 'b7', 'o10', 'c11', 'e12'] }, deck: [], discard: [] } } }; closeHand(g, 'a', null); return g.events[0].scores.a; };
+    return { looseJoker: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1']), allTied: mk(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'b6']) };
+  });
+  check('cerrar con el comodín suelto suma 0, no −10', bonus.looseJoker === 0, JSON.stringify(bonus));
+  check('con las 7 ligadas sí da −10', bonus.allTied === -10, JSON.stringify(bonus));
   check('la máquina no tira el comodín', jk.disc !== 'j1', jk.disc);
   const simJ = await p.evaluate(() => {
     let bad = 0, hands = 0, ended = 0, jokerPlays = 0;
     for (let k = 0; k < 60; k++) {
       const ps = Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: '🤖 ' + i }));
-      const g = { id: uid(), created: Date.now(), cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: 'normal', jokers: 2, jokerValue: 25, bots: ps.map(x => x.id), hand: null } };
+      const g = { id: uid(), created: Date.now(), cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: 'normal', jokers: 2, jokerValue: 0, bots: ps.map(x => x.id), hand: null } };
       let guard = 0;
       while (!compute(g).ended && guard++ < 300) {
         dealHand(g); const h = g.play.hand, all = [...h.deck, ...h.discard, ...Object.values(h.hands).flat()];

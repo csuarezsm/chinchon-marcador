@@ -20,12 +20,12 @@ const CARD_SIZES = [['1', 'normales'], ['1.25', 'grandes'], ['1.5', 'muy grandes
 const BOT_IDEAS = ['Pancho', 'Chano', 'Candelaria', 'Tomasa', 'Juanillo', 'Nieves', 'Pepito', 'Carmela', 'Domingo', 'Fefa', 'Agustín', 'Chona', 'Ramón', 'Pino', 'Chicho', 'Luci'];
 
 // Comodines: ids 'j1' y 'j2'. Sustituyen a cualquier carta; cada combinación necesita al menos 2 cartas de verdad.
-let JOKER_VALUE = 25;                                          // lo que vale un comodín sin ligar
+let JOKER_VALUE = 0;                                           // lo que vale un comodín sin ligar (0: no suma y se puede cerrar con él)
 const isJoker = id => id[0] === 'j';
 const card = id => isJoker(id) ? { id, s: 'j', r: 0, joker: true } : { id, s: id[0], r: Number(id.slice(1)) };
 const cardValue = c => (c.joker ? JOKER_VALUE : c.r <= 7 ? c.r : 10);
 const cardName = c => (c.joker ? 'comodín' : RANK_NAME(c.r) + ' de ' + SUIT_NAME[c.s]);
-function usePlayRules(g) { JOKER_VALUE = g && g.play && Number.isFinite(+g.play.jokerValue) ? +g.play.jokerValue : 25; }
+function usePlayRules(g) { JOKER_VALUE = g && g.play && Number.isFinite(+g.play.jokerValue) ? +g.play.jokerValue : 0; }
 const theCard = c => (c.r === 10 ? 'la ' : 'el ') + cardName(c);   // «la sota», «el rey»
 function newDeck(jokers) {
   const d = [];
@@ -98,7 +98,7 @@ function bestDiscard(ids) {
   let best = null;
   for (const d of ids) {
     const rest = ids.filter(x => x !== d), bm = bestMelds(rest);
-    const sc = bm.dead * 100 - cardValue(card(d)) + (isChinchon(rest) ? -10000 : 0);
+    const sc = bm.dead * 100 - cardValue(card(d)) + (isChinchon(rest) ? -10000 : 0) + (isJoker(d) ? 99 : 0);
     if (!best || sc < best.sc) best = { discard: d, rest, bm, sc };
   }
   return best;
@@ -139,7 +139,7 @@ function closeHand(g, closer, discardId) {
   }
   if (closer) {
     if (isChinchon(h.hands[closer])) { kind = 'chinchon'; scores[closer] = c.chinchon === 'win' ? 0 : c.chinchonPts; }
-    else if (detail[closer].dead === 0) { kind = 'bonus'; scores[closer] = c.closeBonus; }
+    else if (detail[closer].loose.length === 0) { kind = 'bonus'; scores[closer] = c.closeBonus; }   // −10 solo con las 7 ligadas (un comodín suelto no cuenta como ligado)
   }
   if (discardId) h.discard.push(discardId);
   h.phase = 'over';
@@ -259,7 +259,7 @@ function renderTable(g, R) {
     <div class="pt-acts">
       <button class="btn-ghost" id="pScore">📋 Puntos</button>
       <button class="btn-gold" id="pDrop" ${myTurn && h.phase === 'discard' && playSel ? '' : 'disabled'}>Tirar</button>
-      <button class="btn-red" id="pClose" ${canClose ? '' : 'disabled'}>Cerrar${selDead ? ' (' + (isChinchon(h.hands[my].filter(x => x !== playSel)) ? '★' : selDead.dead === 0 ? g.cfg.closeBonus : selDead.dead) + ')' : ''}</button>
+      <button class="btn-red" id="pClose" ${canClose ? '' : 'disabled'}>Cerrar${selDead ? ' (' + (isChinchon(h.hands[my].filter(x => x !== playSel)) ? '★' : selDead.loose.length === 0 ? g.cfg.closeBonus : selDead.dead) + ')' : ''}</button>
     </div>` : `<div class="pt-acts"><button class="btn-ghost" id="pScore">📋 Puntos</button></div>`}</div></div>`;
   const deckB = $('#pDeck'), discB = $('#pDisc');
   if (deckB) deckB.onclick = () => humanDraw(g, 'deck');
@@ -325,7 +325,8 @@ function showHandResult(g) {
 function renderPlaySetup() {
   $('#subtitle').textContent = 'Jugar contra la máquina';
   const d = S.draft;
-  d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal', jokers: 0, jokerValue: 25 }, d.play || {});
+  d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal', jokers: 0, jokerValue: 0 }, d.play || {});
+  if (d.play.jvRule !== 2) { d.play.jokerValue = 0; d.play.jvRule = 2; }       // nueva regla por defecto: suelto vale 0
   if (!Array.isArray(d.play.botNames)) d.play.botNames = BOTS.slice();
   while (d.play.botNames.length < 3) d.play.botNames.push(BOTS[d.play.botNames.length]);
   $('#app').innerHTML = `
@@ -339,7 +340,7 @@ function renderPlaySetup() {
         <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="${BOTS[i]}" style="flex:1;min-width:0">
         <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
       <label class="f"><span>★ Comodines<em>Sustituyen a cualquier carta</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[0, 'Sin'], [2, '2 comodines']].map(([k, l]) => `<button data-jokers="${k}" class="${(d.play.jokers || 0) === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
-      ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>Con uno suelto no se puede cerrar si vale más de ${CLOSE_MAX}</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
+      ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>0 = no suma y se puede cerrar con él suelto</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
       <label class="f"><span>💡 Modo aprendizaje<em>La app te sugiere qué robar, qué tirar y cuándo cerrar</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[false, 'No'], [true, 'Sí']].map(([k, l]) => `<button data-learn="${k}" class="${!!d.play.learn === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas${d.play.jokers ? ' y ' + d.play.jokers + ' comodines' : ''}, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
@@ -366,7 +367,7 @@ function renderPlaySetup() {
   document.querySelectorAll('.sec input, .sec select').forEach(el => el.addEventListener('change', sync));
   document.querySelectorAll('[data-bots]').forEach(b => b.onclick = () => { sync(); d.play.bots = +b.dataset.bots; render(); });
   document.querySelectorAll('[data-jokers]').forEach(b => b.onclick = () => { sync(); d.play.jokers = +b.dataset.jokers; render(); });
-  const jv = $('#plJV'); if (jv) jv.onchange = () => { const v = parseInt(jv.value, 10); d.play.jokerValue = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 25; save(); };
+  const jv = $('#plJV'); if (jv) jv.onchange = () => { const v = parseInt(jv.value, 10); d.play.jokerValue = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0; save(); };
   document.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { sync(); d.play.learn = b.dataset.learn === 'true'; render(); });
   document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { sync(); d.play.level = b.dataset.level; render(); });
   $('#plStart').onclick = () => {
@@ -381,7 +382,7 @@ function renderPlaySetup() {
       taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
     });
     const players = [meP, ...bots];
-    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 25, bots: bots.map(b => b.id), hand: null } };
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 0, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);
     S.lastCfg = Object.assign({}, d.cfg);
     playSel = null; keepAwake(); render();
