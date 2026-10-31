@@ -307,6 +307,74 @@ console.log('Juego contra la máquina');
   await ctx.close();
 }
 
+// Jugar en línea: dos personas en dos móviles + la máquina, contra el servidor real
+{
+  console.log('Jugar en línea');
+  const { createRequire } = await import('node:module');
+  const os = await import('node:os'); const fs = await import('node:fs');
+  Object.assign(process.env, { PASO_BOT_MS: '30', SEGUIR_MS: '6000', AUSENTE_MS: '800', DATA_DIR: fs.mkdtempSync(join(os.tmpdir(), 'juegos-')) });
+  const req = createRequire(import.meta.url);
+  const { crearServidor } = req('../server/src/server.js');
+  const { server: js } = crearServidor();
+  await new Promise(r => js.listen(0, '127.0.0.1', r));
+  const WS = `ws://127.0.0.1:${js.address().port}/ws`;
+  const abrir = async () => {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+    await ctx.addInitScript(u => { window.ONLINE_URL = u; if (!localStorage.getItem('chinchon.v1')) localStorage.setItem('chinchon.v1', JSON.stringify({ onboarded: true })); }, WS);
+    const p = await ctx.newPage(); const errors = []; p.on('pageerror', e => errors.push(e.message));
+    await p.goto(URL_APP); return { p, ctx, errors };
+  };
+  const A = await abrir(), B = await abrir();
+  await A.p.click('[data-mode="online"]');
+  await A.p.waitForSelector('#onStatus:has-text("Conectado")');
+  check('el modo en línea conecta con el servidor', true);
+  await A.p.click('#onCreate');
+  check('pide el nombre antes de crear', await A.p.evaluate(() => !ON.sala));
+  await A.p.fill('#onName', 'Carlos'); await A.p.click('#onCreate');
+  await A.p.waitForSelector('#onCodeBig');
+  const codigo = (await A.p.textContent('#onCodeBig')).trim();
+  check('crea la partida y enseña el código', /^[A-Z2-9]{4}$/.test(codigo), codigo);
+  await B.p.click('[data-mode="online"]'); await B.p.fill('#onName', 'Mari'); await B.p.fill('#onCode', codigo.toLowerCase()); await B.p.click('#onJoin');
+  await B.p.waitForSelector('text=Esperando a que Carlos empiece');
+  check('el segundo móvil entra con el código', true);
+  await A.p.waitForSelector('.on-seat >> nth=1');
+  await A.p.click('#onBot'); await A.p.waitForSelector('.on-seat >> nth=2');
+  check('se añade a la máquina', (await A.p.textContent('.sec:has(.on-seat)')).includes('🤖'));
+  await A.p.click('#onStart');
+  await A.p.waitForSelector('.pt-table'); await B.p.waitForSelector('.pt-table');
+  const manos = await Promise.all([A, B].map(x => x.p.evaluate(() => ON.sala.partida.miMano)));
+  check('cada móvil ve sus 7 cartas y no las del otro', manos[0].length === 7 && manos[1].length === 7 && !manos[0].some(c => manos[1].includes(c)));
+  // juegan los dos desde la pantalla hasta terminar una mano
+  const paso = async x => {
+    const st = await x.p.evaluate(() => { const s = ON.sala; if (!s || !s.partida) return 'nada'; const p = s.partida; if (p.fase === 'over') return document.querySelector('#prNext') ? 'seguir' : 'nada'; return p.turno === s.yo ? p.fase : 'nada'; });
+    if (st === 'draw') await x.p.click('#pDeck:not([disabled])', { timeout: 500 }).catch(() => {});
+    else if (st === 'discard') { const d = await x.p.evaluate(() => bestDiscard(ON.sala.partida.miMano).discard); await x.p.click(`[data-card="${d}"]`, { timeout: 500 }).catch(() => {}); await x.p.click('#pDrop:not([disabled])', { timeout: 500 }).catch(() => {}); }
+    else if (st === 'seguir') { await x.p.click('#prNext', { timeout: 500 }).catch(() => {}); return 'seguir'; }
+    return st;
+  };
+  let vista = false, siguientes = 0;
+  for (let i = 0; i < 600 && siguientes < 2; i++) {
+    for (const x of [A, B]) { if (await x.p.$('#prNext') && (await x.p.textContent('.sec')).includes('anotada')) vista = true; const r = await paso(x); if (r === 'seguir') siguientes++; }
+    await A.p.waitForTimeout(20);
+  }
+  check('al terminar la mano se ven las cartas de todos y los puntos', vista);
+  await A.p.waitForFunction(() => ON.sala.partida.fase !== 'over' || ON.sala.estado === 'fin', null, { timeout: 8000 }).catch(() => {});
+  check('se reparte la siguiente mano', await A.p.evaluate(() => ON.sala.estado === 'fin' || (ON.sala.partida.mano >= 2 && ON.sala.partida.fase !== 'over')));
+  // Mari cierra la app y vuelve: recupera la partida
+  const B2 = { p: await B.ctx.newPage(), errors: [] };
+  await B.p.close(); await B2.p.goto(URL_APP);
+  await B2.p.waitForSelector('.pt-table, #prNext, #onAgain', { timeout: 8000 }).catch(() => {});
+  check('al volver a abrir la app, vuelve a la partida', await B2.p.evaluate(() => !!(ON.sala && ON.sala.codigo)) && (await B2.p.textContent('#subtitle')).includes(codigo));
+  // Carlos abandona: su silla la ocupa la máquina
+  await A.p.click('#pScore'); await A.p.click('#onLeave3'); await A.p.click('#cOk');
+  await A.p.waitForSelector('#onCreate');
+  check('al abandonar vuelve a la pantalla de inicio en línea', await A.p.evaluate(() => !ON.sala));
+  await B2.p.waitForFunction(() => ON.sala && ON.sala.asientos.find(a => a.id === 'p1').bot, null, { timeout: 5000 }).catch(() => {});
+  check('la máquina ocupa la silla de quien abandona', await B2.p.evaluate(() => !!(ON.sala && ON.sala.asientos.find(a => a.id === 'p1').bot)));
+  check('en línea, sin errores de JavaScript', !A.errors.length && !B.errors.length, [...A.errors, ...B.errors].join(' | '));
+  await A.ctx.close(); await B.ctx.close(); js.close();
+}
+
 // Versión de Google Play: sin actualizador propio ni donativos
 {
   const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, serviceWorkers: 'block' });
