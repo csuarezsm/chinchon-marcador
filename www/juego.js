@@ -19,13 +19,18 @@ const BOTS = ['Paco', 'Lola', 'Manolo'];
 const CARD_SIZES = [['1', 'normales'], ['1.25', 'grandes'], ['1.5', 'muy grandes']];
 const BOT_IDEAS = ['Pancho', 'Chano', 'Candelaria', 'Tomasa', 'Juanillo', 'Nieves', 'Pepito', 'Carmela', 'Domingo', 'Fefa', 'Agustín', 'Chona', 'Ramón', 'Pino', 'Chicho', 'Luci'];
 
-const card = id => ({ id, s: id[0], r: Number(id.slice(1)) });
-const cardValue = c => (c.r <= 7 ? c.r : 10);
-const cardName = c => RANK_NAME(c.r) + ' de ' + SUIT_NAME[c.s];
+// Comodines: ids 'j1' y 'j2'. Sustituyen a cualquier carta; cada combinación necesita al menos 2 cartas de verdad.
+let JOKER_VALUE = 25;                                          // lo que vale un comodín sin ligar
+const isJoker = id => id[0] === 'j';
+const card = id => isJoker(id) ? { id, s: 'j', r: 0, joker: true } : { id, s: id[0], r: Number(id.slice(1)) };
+const cardValue = c => (c.joker ? JOKER_VALUE : c.r <= 7 ? c.r : 10);
+const cardName = c => (c.joker ? 'comodín' : RANK_NAME(c.r) + ' de ' + SUIT_NAME[c.s]);
+function usePlayRules(g) { JOKER_VALUE = g && g.play && Number.isFinite(+g.play.jokerValue) ? +g.play.jokerValue : 25; }
 const theCard = c => (c.r === 10 ? 'la ' : 'el ') + cardName(c);   // «la sota», «el rey»
-function newDeck() {
+function newDeck(jokers) {
   const d = [];
   for (const s of SUITS) for (const r of RANKS) d.push(s + r);
+  for (let j = 1; j <= (jokers || 0); j++) d.push('j' + j);
   for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
   return d;
 }
@@ -34,51 +39,55 @@ function newDeck() {
    Devuelve { melds: [[ids]], loose: [ids], dead: puntos sin ligar }.
    Grupos: 3 o 4 del mismo número. Escaleras: 3 o más seguidas del mismo palo. */
 function bestMelds(ids) {
-  const cs = ids.map(card), n = cs.length;
-  const cands = [];
+  const jokers = ids.filter(isJoker), reals = ids.filter(x => !isJoker(x));
+  const cs = reals.map(card), n = cs.length, J = jokers.length;
+  const cands = [];                                            // { mask: cartas de verdad, k: comodines que usa }
+  const subsets = (arr, min) => { const out = []; for (let m = 1; m < (1 << arr.length); m++) { const pick = arr.filter((_, b) => m & (1 << b)); if (pick.length >= min) out.push(pick); } return out; };
+  // grupos: mismo número, 3 o 4 en total
   const byRank = {};
   cs.forEach((c, i) => (byRank[c.r] = byRank[c.r] || []).push(i));
-  for (const r in byRank) {
-    const g = byRank[r];
-    if (g.length >= 3) {
-      if (g.length === 4) cands.push(g.reduce((m, i) => m | (1 << i), 0));
-      for (let a = 0; a < g.length; a++) for (let b = a + 1; b < g.length; b++) for (let c = b + 1; c < g.length; c++) cands.push((1 << g[a]) | (1 << g[b]) | (1 << g[c]));
-    }
+  for (const r in byRank) for (const pick of subsets(byRank[r], 2)) {
+    const mask = pick.reduce((m, i) => m | (1 << i), 0);
+    for (let k = 0; k <= J; k++) if (pick.length + k >= 3 && pick.length + k <= 4) cands.push({ mask, k });
   }
+  // escaleras: mismo palo, posiciones seguidas; los huecos los tapan comodines
   for (const s of SUITS) {
-    const idx = cs.map((c, i) => [c, i]).filter(([c]) => c.s === s).sort((a, b) => RANK_IDX[a[0].r] - RANK_IDX[b[0].r]);
-    for (let a = 0; a < idx.length; a++) {
-      let mask = 1 << idx[a][1], len = 1;
-      for (let b = a + 1; b < idx.length && RANK_IDX[idx[b][0].r] === RANK_IDX[idx[b - 1][0].r] + 1; b++) {
-        mask |= 1 << idx[b][1]; len++;
-        if (len >= 3) cands.push(mask);
+    const inSuit = cs.map((c, i) => [c, i]).filter(([c]) => c.s === s);
+    for (let a = 0; a < RANKS.length; a++) for (let b = a + 2; b < RANKS.length; b++) {
+      const win = inSuit.filter(([c]) => RANK_IDX[c.r] >= a && RANK_IDX[c.r] <= b).map(([, i]) => i);
+      for (const pick of subsets(win, 2)) {
+        const k = (b - a + 1) - pick.length;
+        if (k > J) continue;
+        // los extremos del tramo tienen que ser cartas de verdad o comodines: vale cualquiera, pero evitamos duplicados triviales exigiendo carta real en un extremo
+        const idxs = pick.map(i => RANK_IDX[cs[i].r]);
+        if (!idxs.includes(a) && !idxs.includes(b)) continue;
+        cands.push({ mask: pick.reduce((m, i) => m | (1 << i), 0), k });
       }
     }
   }
   const memo = new Map();
-  const solve = mask => {
-    if (!mask) return { dead: 0, used: [] };
-    if (memo.has(mask)) return memo.get(mask);
+  const solve = (mask, jl) => {
+    if (!mask) return { dead: jl * JOKER_VALUE, used: [] };
+    const key = mask * 8 + jl;
+    if (memo.has(key)) return memo.get(key);
     const i = 31 - Math.clz32(mask & -mask), bit = 1 << i;
-    let best = solve(mask & ~bit); best = { dead: best.dead + cardValue(cs[i]), used: best.used };
-    for (const m of cands) if ((m & bit) && (m & mask) === m) {
-      const r = solve(mask & ~m);
+    let best = solve(mask & ~bit, jl); best = { dead: best.dead + cardValue(cs[i]), used: best.used };
+    for (const m of cands) if ((m.mask & bit) && (m.mask & mask) === m.mask && m.k <= jl) {
+      const r = solve(mask & ~m.mask, jl - m.k);
       if (r.dead < best.dead) best = { dead: r.dead, used: [m, ...r.used] };
     }
-    memo.set(mask, best);
+    memo.set(key, best);
     return best;
   };
-  const res = solve((1 << n) - 1);
-  const inMeld = res.used.reduce((a, m) => a | m, 0);
-  return {
-    melds: res.used.map(m => cs.filter((_, i) => m & (1 << i)).map(c => c.id)),
-    loose: cs.filter((_, i) => !(inMeld & (1 << i))).map(c => c.id),
-    dead: res.dead
-  };
+  const res = solve((1 << n) - 1, J);
+  const inMeld = res.used.reduce((a, m) => a | m.mask, 0);
+  let jk = 0;
+  const melds = res.used.map(m => [...cs.filter((_, i) => m.mask & (1 << i)).map(c => c.id), ...jokers.slice(jk, (jk += m.k))]);
+  return { melds, loose: [...cs.filter((_, i) => !(inMeld & (1 << i))).map(c => c.id), ...jokers.slice(jk)], dead: res.dead };
 }
 // ¿Las 7 cartas son una escalera de 7 del mismo palo?
 function isChinchon(ids) {
-  if (ids.length !== 7) return false;
+  if (ids.length !== 7 || ids.some(isJoker)) return false;     // el chinchón es sin comodín
   const cs = ids.map(card);
   if (!cs.every(c => c.s === cs[0].s)) return false;
   const ix = cs.map(c => RANK_IDX[c.r]).sort((a, b) => a - b);
@@ -103,7 +112,8 @@ function dealHand(g) {
   const R = compute(g);
   const order = []; let i = g.players.findIndex(p => p.id === R.lead);
   for (let k = 0; k < g.players.length; k++) { const p = g.players[(i + k) % g.players.length]; if (!R.st[p.id].out) order.push(p.id); }
-  const deck = newDeck(), hands = {};
+  usePlayRules(g);
+  const deck = newDeck(g.play.jokers), hands = {};
   order.forEach(pid => (hands[pid] = deck.splice(0, 7)));
   g.play.hand = { dealer: R.next, order, hands, deck, discard: [deck.shift()], turn: order[0], phase: 'draw', turns: 0, log: pname(g, R.next) + ' ha repartido. Sale ' + pname(g, order[0]) + '.', result: null };
 }
@@ -118,6 +128,7 @@ function nextTurn(h) {
 }
 // Termina la mano: puntos de cada uno y se anota en el marcador
 function closeHand(g, closer, discardId) {
+  usePlayRules(g);
   const h = g.play.hand, c = g.cfg;
   const scores = {}, detail = {};
   let kind = 'normal';
@@ -138,6 +149,7 @@ function closeHand(g, closer, discardId) {
 
 /* ---------- La máquina ---------- */
 function botStep(g) {
+  usePlayRules(g);
   const h = g.play.hand, pid = h.turn, easy = g.play.level === 'facil';
   const hand = h.hands[pid];
   if (h.phase === 'draw') {
@@ -181,6 +193,8 @@ function cardHtml(id, opts) {
   opts = opts || {};
   if (!id) return '<div class="pc-card empty"></div>';
   const c = card(id), tag = opts.data ? 'button' : 'div';   // solo las cartas de tu mano son botones
+  if (c.joker) return `<${tag} class="pc-card joker ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="comodín" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
+    <b class="pc-r pc-j">★</b><span class="pc-s"><svg viewBox="0 0 24 24"><path d="M12 2l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.6 8.8l6.8-.5z" fill="#7d3c98"/></svg></span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new">nueva</em>' : ''}</${tag}>`;
   return `<${tag} class="pc-card ${opts.sel ? 'sel' : ''} ${opts.tip ? 'tip' : ''} ${opts.small ? 'small' : ''}" ${opts.data || ''} aria-label="${cardName(c)}" style="${opts.meld != null ? '--mc:' + MELD_COLORS[opts.meld % MELD_COLORS.length] : ''}">
     <b class="pc-r pc-${c.s}">${RANK_LABEL(c.r)}</b><span class="pc-s">${SUIT_SVG[c.s]}</span>${opts.meld != null ? '<i class="pc-m"></i>' : ''}${opts.isNew ? '<em class="pc-new">nueva</em>' : ''}</${tag}>`;
 }
@@ -189,7 +203,7 @@ function backHtml(n) { return `<div class="pc-card back"><span>${n != null ? n :
 function arrangeHand(ids) {
   const bm = bestMelds(ids), meldOf = {};
   bm.melds.forEach((m, i) => m.forEach(id => (meldOf[id] = i)));
-  const key = id => { const c = card(id); return (meldOf[id] != null ? meldOf[id] * 1000 : 9000) + SUITS.indexOf(c.s) * 20 + RANK_IDX[c.r]; };
+  const key = id => { const c = card(id); return (meldOf[id] != null ? meldOf[id] * 1000 : 9000) + (c.joker ? 900 : SUITS.indexOf(c.s) * 20 + RANK_IDX[c.r]); };
   return { ids: ids.slice().sort((a, b) => key(a) - key(b)), meldOf, bm };
 }
 
@@ -197,6 +211,7 @@ function arrangeHand(ids) {
 let playTimer = null, playSel = null;
 function me(g) { return g.players.find(p => !isBot(g, p.id)).id; }
 function renderTable(g, R) {
+  usePlayRules(g);
   clearTimeout(playTimer);
   if (!g.play.hand) { dealHand(g); save(); }
   const h = g.play.hand, my = me(g), myOut = !h.order.includes(my);
@@ -310,7 +325,7 @@ function showHandResult(g) {
 function renderPlaySetup() {
   $('#subtitle').textContent = 'Jugar contra la máquina';
   const d = S.draft;
-  d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal' }, d.play || {});
+  d.play = Object.assign({ name: (S.roster && S.roster[0]) || '', bots: 2, level: 'normal', jokers: 0, jokerValue: 25 }, d.play || {});
   if (!Array.isArray(d.play.botNames)) d.play.botNames = BOTS.slice();
   while (d.play.botNames.length < 3) d.play.botNames.push(BOTS[d.play.botNames.length]);
   $('#app').innerHTML = `
@@ -323,9 +338,11 @@ function renderPlaySetup() {
       ${Array.from({ length: d.play.bots }, (_, i) => `<label class="f"><span>🤖 Rival ${i + 1}</span>
         <span style="display:flex;gap:6px;width:55%"><input type="text" data-botname="${i}" maxlength="16" value="${esc(d.play.botNames[i])}" placeholder="${BOTS[i]}" style="flex:1;min-width:0">
         <button class="closebtn" data-botdice="${i}" aria-label="Nombre al azar">🎲</button></span></label>`).join('')}
+      <label class="f"><span>★ Comodines<em>Sustituyen a cualquier carta</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[0, 'Sin'], [2, '2 comodines']].map(([k, l]) => `<button data-jokers="${k}" class="${(d.play.jokers || 0) === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
+      ${d.play.jokers ? `<label class="f"><span>Comodín sin ligar vale<em>Con uno suelto no se puede cerrar si vale más de ${CLOSE_MAX}</em></span><input type="number" inputmode="numeric" id="plJV" value="${d.play.jokerValue}" style="width:90px"></label>` : ''}
       <label class="f"><span>💡 Modo aprendizaje<em>La app te sugiere qué robar, qué tirar y cuándo cerrar</em></span><span class="kinds" style="flex:none;width:55%;margin:0">${[[false, 'No'], [true, 'Sí']].map(([k, l]) => `<button data-learn="${k}" class="${!!d.play.learn === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
       <label class="f"><span>Dificultad</span><span class="kinds" style="flex:none;width:55%;margin:0">${[['facil', 'Fácil'], ['normal', 'Normal']].map(([k, l]) => `<button data-level="${k}" class="${d.play.level === k ? 'on' : ''}">${l}</button>`).join('')}</span></label>
-      <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
+      <div class="mut" style="margin-top:8px;line-height:1.45">Baraja española de 40 cartas${d.play.jokers ? ' y ' + d.play.jokers + ' comodines' : ''}, 7 por jugador. Se cierra con ${CLOSE_MAX} o menos sin ligar; con todo ligado, ${d.cfg.closeBonus}; la escalera de 7 del mismo palo es chinchón.</div>
     </div>
     <div class="sec"><h2>Reglas</h2>${cfgFields(d.cfg, 's_')}</div>
     <div class="copy">© 2026 IT Canarias</div>
@@ -348,6 +365,8 @@ function renderPlaySetup() {
   $('#plName').oninput = sync;
   document.querySelectorAll('.sec input, .sec select').forEach(el => el.addEventListener('change', sync));
   document.querySelectorAll('[data-bots]').forEach(b => b.onclick = () => { sync(); d.play.bots = +b.dataset.bots; render(); });
+  document.querySelectorAll('[data-jokers]').forEach(b => b.onclick = () => { sync(); d.play.jokers = +b.dataset.jokers; render(); });
+  const jv = $('#plJV'); if (jv) jv.onchange = () => { const v = parseInt(jv.value, 10); d.play.jokerValue = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 25; save(); };
   document.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => { sync(); d.play.learn = b.dataset.learn === 'true'; render(); });
   document.querySelectorAll('[data-level]').forEach(b => b.onclick = () => { sync(); d.play.level = b.dataset.level; render(); });
   $('#plStart').onclick = () => {
@@ -362,7 +381,7 @@ function renderPlaySetup() {
       taken.add(nkey(n)); return { id: uid(), name: '🤖 ' + n };
     });
     const players = [meP, ...bots];
-    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, bots: bots.map(b => b.id), hand: null } };
+    S.game = { id: uid(), created: Date.now(), cfg: Object.assign({}, d.cfg), players, firstDealer: players[players.length - 1].id, events: [], play: { level: d.play.level, learn: !!d.play.learn, jokers: d.play.jokers || 0, jokerValue: d.play.jokerValue ?? 25, bots: bots.map(b => b.id), hand: null } };
     if (!/^Jugador \d+$/.test(meP.name) && !S.roster.some(x => nkey(x) === nkey(meP.name))) S.roster.push(meP.name);
     S.lastCfg = Object.assign({}, d.cfg);
     playSel = null; keepAwake(); render();

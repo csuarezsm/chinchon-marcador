@@ -211,6 +211,41 @@ console.log('Juego contra la máquina');
     }
     return { games, hands, bad, ended };
   });
+  const jk = await p.evaluate(() => ({
+    group: bestMelds(['o5', 'c5', 'j1', 'b2', 'b3', 'b4', 'o1']).dead,          // 5-5-comodín + 2-3-4 de bastos, suelto el as
+    gap: bestMelds(['c1', 'c2', 'j1', 'c4', 'o7', 'e7', 'b7']).dead,            // as-2-(comodín)-4 de copas + trío de 7
+    two: bestMelds(['o5', 'o6', 'j1', 'j2', 'c1', 'e1', 'b1']).dead,            // 5-6 + 2 comodines + trío de ases
+    loose: bestMelds(['j1', 'o1', 'c3', 'e5', 'b7', 'o10', 'c11']).dead,        // comodín con una sola carta no liga: vale 25
+    alone: bestMelds(['j1', 'j2', 'o1', 'c3', 'e5', 'b7', 'o10']).dead,
+    chin: isChinchon(['e1', 'e2', 'j1', 'e4', 'e5', 'e6', 'e7']),
+    disc: bestDiscard(['o5', 'c5', 'e5', 'b2', 'b3', 'b4', 'j1', 'c12']).discard
+  }));
+  check('comodín completa un grupo', jk.group === 1, JSON.stringify(jk));
+  check('comodín tapa un hueco en la escalera', jk.gap === 0);
+  check('dos comodines con dos cartas forman escalera', jk.two === 0);
+  check('comodín suelto vale 25', jk.loose === 61, String(jk.loose));
+  check('los comodines necesitan al menos 2 cartas de verdad', jk.alone === 76, String(jk.alone));
+  check('el chinchón no vale con comodín', !jk.chin);
+  check('la máquina no tira el comodín', jk.disc !== 'j1', jk.disc);
+  const simJ = await p.evaluate(() => {
+    let bad = 0, hands = 0, ended = 0, jokerPlays = 0;
+    for (let k = 0; k < 60; k++) {
+      const ps = Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: '🤖 ' + i }));
+      const g = { id: uid(), created: Date.now(), cfg: Object.assign({}, DEF_CFG, { rebuyMode: 'none' }), players: ps, firstDealer: ps[0].id, events: [], play: { level: 'normal', jokers: 2, jokerValue: 25, bots: ps.map(x => x.id), hand: null } };
+      let guard = 0;
+      while (!compute(g).ended && guard++ < 300) {
+        dealHand(g); const h = g.play.hand, all = [...h.deck, ...h.discard, ...Object.values(h.hands).flat()];
+        if (all.length !== 42 || new Set(all).size !== 42) bad++;
+        runBotsInstant(g); hands++;
+        const e = g.events[g.events.length - 1];
+        if (e.closer && e.kind === 'normal' && e.scores[e.closer] > 5) bad++;
+        if (Object.values(h.hands).flat().some(isJoker)) jokerPlays++;
+      }
+      if (compute(g).ended) ended++;
+    }
+    return { bad, hands, ended, jokerPlays };
+  });
+  check(`60 partidas con comodines sin errores (${simJ.hands} manos)`, simJ.bad === 0 && simJ.ended === 60, JSON.stringify(simJ));
   check(`150 partidas simuladas sin errores (${sim.hands} manos)`, sim.bad === 0, JSON.stringify(sim));
   check('todas las partidas simuladas terminan', sim.ended === sim.games, JSON.stringify(sim));
   // partida jugada desde la pantalla
