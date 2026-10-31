@@ -1,0 +1,25 @@
+name: Servidor de juegos
+on:
+  push:
+    branches: [main]
+    paths: ['server/**', 'www/marcador.js', 'www/juego.js', '.dockerignore', '.github/workflows/servidor.yml']
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Pruebas del servidor
+        working-directory: server
+        run: npm ci && npm test
+      - name: Construir y arrancar la imagen Docker
+        working-directory: server
+        run: |
+          docker compose build
+          PUERTO=3199 docker compose up -d
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3199/salud && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3199/salud | grep -q '"ok":true'
+          docker compose logs
+          docker compose down -v

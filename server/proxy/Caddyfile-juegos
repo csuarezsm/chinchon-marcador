@@ -1,0 +1,4 @@
+# Añadir al final de /etc/caddy/Caddyfile (Caddy saca el certificado solo y ya pasa WebSocket)
+juegos.itcanarias.com {
+    reverse_proxy 127.0.0.1:3100
+}

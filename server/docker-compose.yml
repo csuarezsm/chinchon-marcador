@@ -1,0 +1,27 @@
+# Servidor de partidas · IT Canarias
+# Contenedor aislado: solo escucha en 127.0.0.1 (el proxy del servidor le pasa el tráfico de juegos.itcanarias.com)
+name: itc-juegos
+services:
+  juegos:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: itc-juegos:latest
+    container_name: itc-juegos
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PUERTO:-3100}:3100"
+    volumes:
+      - juegos-datos:/datos
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+volumes:
+  juegos-datos:

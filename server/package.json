@@ -1,0 +1,19 @@
+{
+  "name": "itc-juegos-servidor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor de partidas en línea de las apps de juegos de IT Canarias",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/servidor.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.22.1"
+  }
+}

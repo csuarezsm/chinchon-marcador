@@ -1,0 +1,17 @@
+# Solo si tu proxy es Traefik en Docker. Uso:
+#   docker compose -f docker-compose.yml -f proxy/docker-compose.traefik.yml up -d --build
+# Cambia "proxy" por el nombre de la red de Traefik y "letsencrypt" por tu certresolver.
+services:
+  juegos:
+    ports: !reset []
+    networks: [proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.itc-juegos.rule=Host(`juegos.itcanarias.com`)
+      - traefik.http.routers.itc-juegos.entrypoints=websecure
+      - traefik.http.routers.itc-juegos.tls.certresolver=letsencrypt
+      - traefik.http.services.itc-juegos.loadbalancer.server.port=3100
+networks:
+  proxy:
+    external: true
