@@ -11,5 +11,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // Mantener la pantalla encendida mientras se juega
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // Fondo detrás de las barras del sistema (la app no se dibuja debajo de ellas)
+        getWindow().getDecorView().setBackgroundColor(android.graphics.Color.parseColor("#0b2a20"));
     }
 }

@@ -2,5 +2,8 @@
   "appId": "com.itcanarias.chinchon",
   "appName": "Chinchón",
   "webDir": "www",
-  "android": { "backgroundColor": "#0b2a20" }
+  "android": {
+    "backgroundColor": "#0b2a20",
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
 }

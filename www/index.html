@@ -275,6 +275,8 @@ function applyTheme(key) {
   for (const k in map) r.setProperty(map[k], t[k]);
   document.documentElement.style.colorScheme = key === 'claro' ? 'light' : 'dark';
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t.felt);
+  // En la app Android, el fondo de las barras del sistema sigue al tema
+  try { const U = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater; if (U && U.setSystemBars) U.setSystemBars({ color: t.felt, light: key === 'claro' }).catch(() => {}); } catch (e) {}
 }
 const FONT_SIZES = [['1', 'Normal'], ['1.15', 'Grande'], ['1.3', 'Muy grande']];
 function applyFont() {
@@ -300,7 +302,7 @@ function openThemes() {
   $('#thOk').onclick = closeModal;
 }
 
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.6.1';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const DEF_CFG = {
