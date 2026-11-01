@@ -361,7 +361,7 @@ function openThemes() {
   AvisoTurno.enlazar();
 }
 
-const APP_VERSION = '2.11.2';
+const APP_VERSION = '2.11.3';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1490,7 +1490,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mRoster">👥 Jugadores habituales</button>
       <div class="mt">Ajustes y ayuda</div>
-      <div class="mg2"><button id="mTheme">🎨 Colores y tamaños</button><button id="mLang">🌐 Idioma · Language</button><button id="mHelp">❓ Cómo se usa</button><button id="mGameRules">📖 Reglas del chinchón</button></div>
+      <div class="mg2"><button id="mTheme">🎨 Colores, letra y sonido</button><button id="mLang">🌐 Idioma · Language</button><button id="mHelp">❓ Cómo se usa</button><button id="mGameRules">📖 Reglas del chinchón</button></div>
       <div class="mt">La app</div>
       ${isIOS() && !isStandalone() && !isNative() ? '<button id="mIOS" class="btn-gold">📲 Instalar en el iPhone</button>' : ''}
       ${isPlay() || !isNative() ? '' : hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
@@ -1507,7 +1507,7 @@ $('#menuBtn').onclick = () => {
       <button id="mArch">📊 Clasificación y partidas</button>
       <button id="mRoster">👥 Jugadores habituales</button>
       <div class="mt">Ajustes y ayuda</div>
-      <div class="mg2"><button id="mTheme">🎨 Colores y tamaños</button><button id="mLang">🌐 Idioma · Language</button><button id="mHelp">❓ Cómo se usa</button><button id="mGameRules">📖 Reglas del chinchón</button></div>
+      <div class="mg2"><button id="mTheme">🎨 Colores, letra y sonido</button><button id="mLang">🌐 Idioma · Language</button><button id="mHelp">❓ Cómo se usa</button><button id="mGameRules">📖 Reglas del chinchón</button></div>
       <div class="mt">La app</div>
       ${isIOS() && !isStandalone() && !isNative() ? '<button id="mIOS" class="btn-gold">📲 Instalar en el iPhone</button>' : ''}
       ${isPlay() || !isNative() ? '' : hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
