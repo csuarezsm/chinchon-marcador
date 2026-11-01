@@ -1,7 +1,7 @@
 # Chinchón · Marcador
 
 Marcador de puntos para el chinchón. App Android (Capacitor) y PWA a partir del mismo código (`www/`).
-Paquete: `com.itcanarias.chinchon` · versión 2.10.2
+Paquete: `com.itcanarias.chinchon` · versión 2.11.0
 
 **iPhone y navegadores**: la misma app se publica como versión web instalable en https://csuarezsm.github.io/chinchon-marcador/app/ (GitHub Pages, carpeta `docs/app`, copia de `www/`). En Safari: Compartir → «Añadir a pantalla de inicio». Tras cambiar `www/`, ejecuta `npm run web` antes del commit: las pruebas y el workflow comprueban que `docs/app` está al día. La página de descarga (https://csuarezsm.github.io/chinchon-marcador/) ofrece Android e iPhone, y el mensaje de «Compartir la app» enlaza a ella.
 

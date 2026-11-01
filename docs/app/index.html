@@ -296,6 +296,7 @@ body:has(.pt-table){padding-bottom:env(safe-area-inset-bottom)}
 <script src="sonidos-cartas.js"></script>
 <script src="contador.js"></script>
 <script src="invitacion.js"></script>
+<script src="publicas.js"></script>
 <script>
 'use strict';
 /* ================= Estado y persistencia ================= */
@@ -357,7 +358,7 @@ function openThemes() {
   AvisoTurno.enlazar();
 }
 
-const APP_VERSION = '2.10.2';
+const APP_VERSION = '2.11.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
