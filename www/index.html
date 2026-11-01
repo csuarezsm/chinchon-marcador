@@ -266,6 +266,9 @@ body:has(.pt-table){padding-bottom:env(safe-area-inset-bottom)}
 .pt-learn{background:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--mut);margin-left:4px}
 .pc-m{position:absolute;left:6px;right:6px;bottom:2px;height:4px;border-radius:2px;background:var(--mc)}
 .empty{text-align:center;color:var(--mut);padding:20px}
+.rules h4{color:var(--gold);margin:14px 0 4px}
+.rules p,.rules li{color:var(--txt);line-height:1.5;margin:4px 0}
+.rules ul{padding-left:20px;margin:4px 0}
 </style>
 </head>
 <body>
@@ -284,10 +287,15 @@ body:has(.pt-table){padding-bottom:env(safe-area-inset-bottom)}
 <script src="online.js"></script>
 <script>window.APP_ID = 'chinchon';</script>
 <script src="i18n-en.js"></script>
+<script src="i18n-fr.js"></script>
+<script src="i18n-de.js"></script>
+<script src="i18n-it.js"></script>
 <script src="idioma.js"></script>
 <script src="masjuegos.js"></script>
 <script src="turno.js"></script>
+<script src="sonidos-cartas.js"></script>
 <script src="contador.js"></script>
+<script src="invitacion.js"></script>
 <script>
 'use strict';
 /* ================= Estado y persistencia ================= */
@@ -335,8 +343,13 @@ function openThemes() {
         <div class="pv" style="background:${t.bg}"><i style="background:${t.card}"></i><i style="background:${t.card2}"></i><b style="background:${t.gold}"></b></div>
         <div class="tn" style="color:${t.txt}">${esc(t.name)}<span style="color:${t.gold}">${k === cur ? '✓' : ''}</span></div>
       </button>`).join('')}</div>
-    <h3>🔔 Juego en línea</h3>${AvisoTurno.opcionHtml()}
+    <h3>🎵 Juego</h3>
+    <label class="f"><span>Sonidos<em>Repartir, robar, echar carta y fin de mano</em></span><input type="checkbox" class="tg" id="thSound" ${S.sound !== false ? 'checked' : ''}></label>
+    <label class="f" style="margin-bottom:10px"><span>Velocidad de la máquina<em>Cuánto tarda en jugar cada carta</em></span><span class="kinds" style="flex:none;width:50%;margin:0">${[['normal', 'Normal'], ['rapida', 'Rápida']].map(([v, l]) => `<button data-speed="${v}" class="${(S.speed || 'normal') === v ? 'on' : ''}">${l}</button>`).join('')}</span></label>
+    <h3>🔔 Avisos</h3>${AvisoTurno.opcionHtml()}
     <div class="acts"><button class="btn-gold" id="thOk">Listo</button></div>`);
+  $('#thSound').onchange = e => { S.sound = e.target.checked; save(); if (S.sound) SonidoCartas.play('carta'); };
+  document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => { S.speed = b.dataset.speed; save(); openThemes(); });
   document.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { S.theme = b.dataset.theme; applyTheme(S.theme); save(); openThemes(); });
   document.querySelectorAll('[data-cs]').forEach(b => b.onclick = () => { S.cardScale = b.dataset.cs; save(); openThemes(); });
   document.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => { S.fontScale = b.dataset.fs; applyFont(); save(); openThemes(); });
@@ -344,7 +357,7 @@ function openThemes() {
   AvisoTurno.enlazar();
 }
 
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.10.0';
 const REPO = 'csuarezsm/chinchon-marcador';
 const MAX_ARCHIVE = 500;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -782,6 +795,30 @@ function openWelcome(i) {
   $('#wbNext').onclick = () => last ? done() : openWelcome(i + 1);
 }
 
+/* ---------- Reglas del juego ---------- */
+function openGameRules() {
+  const c = (S.game && S.game.cfg) || (S.draft && S.draft.cfg) || DEF_CFG;
+  openModal(`<h3>📖 Reglas del chinchón</h3><div class="sub">Lo esencial, tal como lo aplica la app. Los puntos se pueden cambiar en cada partida.</div><div class="rules">
+    <h4>La baraja y el reparto</h4><p>Baraja española de 40 cartas (sin ochos ni nueves), y si queréis, dos comodines. Se reparten 7 cartas a cada jugador y se pone una boca arriba para empezar el descarte. Sale el de la derecha de quien reparte.</p>
+    <h4>El turno</h4><ul>
+      <li>Robas una carta: la de arriba del <b>mazo</b> o la última del <b>descarte</b>.</li>
+      <li>Luego tiras una carta al descarte. Siempre te quedas con 7.</li></ul>
+    <h4>Ligar las cartas</h4><ul>
+      <li><b>Grupos</b>: 3 o 4 cartas del mismo número.</li>
+      <li><b>Escaleras</b>: 3 o más cartas seguidas del mismo palo. El 7 y la sota van seguidos.</li>
+      <li>Cada carta solo puede estar en una combinación. El <b>comodín</b> sustituye a cualquier carta; cada combinación necesita al menos dos cartas de verdad.</li></ul>
+    <h4>Cerrar</h4><ul>
+      <li>Al tirar, puedes <b>cerrar</b> si las cartas que te quedan sin ligar suman 5 o menos. Desde la segunda vuelta (se puede cambiar al empezar).</li>
+      <li>Las cartas valen su número; sota, caballo y rey, 10.</li>
+      <li>Al cerrar, cada jugador suma lo que tiene sin ligar. Quien cierra con las 7 ligadas se apunta ${c.closeBonus} puntos.</li>
+      <li><b>Chinchón</b>: una escalera de 7 del mismo palo, sin comodín. ${c.chinchon === 'win' ? 'Gana la partida directamente.' : 'Se apunta ' + c.chinchonPts + ' puntos.'}</li></ul>
+    <h4>Eliminados y final</h4><ul>
+      <li>Quien pasa de ${c.limit} puntos queda <b>eliminado</b>. Si las reglas lo permiten, puede <b>reengancharse</b>: vuelve con los puntos del que más tiene (o los que se fijen).</li>
+      <li>Gana el último que queda sin eliminar.</li></ul>
+  </div><div class="acts"><button class="btn-gold" id="grOk">Entendido</button></div>`);
+  $('#grOk').onclick = closeModal;
+}
+
 /* ---------- Compartir la app ---------- */
 const APK_URL = 'https://github.com/' + REPO + '/releases/latest/download/chinchon.apk';
 const WEB_URL = 'https://csuarezsm.github.io/chinchon-marcador/app/';          // versión web instalable (iPhone y cualquier navegador)
@@ -1198,6 +1235,7 @@ function openArchive(tab) {
 /* ---------- Partida en curso ---------- */
 function renderGame() {
   const g = S.game, R = compute(g), c = g.cfg;
+  if (g.play) { const h = g.play.hand; if (h) SonidoCartas.mesa({ mano: R.hand + (h.phase === 'over' ? 0 : 1), turnos: h.turns, fase: h.phase, mazo: h.deck.length, mesa: (h.pile || h.discard).length, fin: !!R.ended }, true); }
   if (g.play && !R.ended) return renderTable(g, R);
   clearTimeout(playTimer);
   $('#subtitle').textContent = R.ended ? 'Partida terminada' : `Mano ${R.hand + 1} · límite ${c.limit}`;
@@ -1454,6 +1492,7 @@ $('#menuBtn').onclick = () => {
       <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button id="mHelp">❓ Cómo se usa</button>
+      <button id="mGameRules">📖 Reglas del chinchón</button>
       <button id="mWipe">🗑 Borrar datos…</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   } else {
@@ -1472,12 +1511,14 @@ $('#menuBtn').onclick = () => {
       ${isPlay() || !isNative() ? '' : hasUpd() ? `<button id="mUpd" class="btn-gold">🎉 Actualizar a v${esc(S.updAvail.v)} (nueva)</button>` : '<button id="mUpd">🔄 Buscar actualizaciones</button>'}
       <button id="mTheme">🎨 Colores y tamaños</button>
       <button id="mHelp">❓ Cómo se usa</button>
+      <button id="mGameRules">📖 Reglas del chinchón</button>
       <button id="mAbout">ℹ️ Acerca de</button>
       <button class="btn-ghost" id="mClose">Cerrar</button></div>`);
   }
   const on = (id, fn) => { const el = $('#' + id); if (el) el.onclick = fn; };
   on('mClose', closeModal);
   on('mHelp', () => openWelcome(0));
+  on('mGameRules', openGameRules);
   on('mWipe', openWipe);
   on('mTheme', openThemes);
   on('mUpd', () => hasUpd() ? openUpdAvail() : checkUpdates(true));

@@ -309,6 +309,7 @@ function renderTable(g, R) {
   $('#subtitle').textContent = 'Mano ' + (R.hand + 1) + ' · contra la máquina';
   const top = h.discard[h.discard.length - 1];
   const myTurn = h.turn === my && h.phase !== 'over';
+  AvisoTurno.local(myTurn && h.phase === 'draw', g.id + ':' + R.hand + ':' + h.turns);   // aviso de que te toca (se quita en ajustes)
   const arr = h.hands[my] ? arrangeHand(h.hands[my]) : null;
   let selDead = null;
   if (arr && myTurn && h.phase === 'discard' && playSel && h.hands[my].includes(playSel)) selDead = bestMelds(h.hands[my].filter(x => x !== playSel));
@@ -364,7 +365,7 @@ function renderTable(g, R) {
   $('#pScore').onclick = () => { openModal(`<h3>📋 Puntuaciones</h3>${historyTable(g, compute(g), false)}<div class="acts"><button class="btn-gold" id="psOk">Volver a la mesa</button></div>`); $('#psOk').onclick = closeModal; };
   if (h.phase === 'over') { showHandResult(g); return; }
   if (myOut) { runBotsInstant(g); save(); render(); return; }
-  if (isBot(g, h.turn)) playTimer = setTimeout(() => { if (S.game !== g) return; botStep(g); save(); render(); }, window.PLAY_DELAY || 750);
+  if (isBot(g, h.turn)) playTimer = setTimeout(() => { if (S.game !== g) return; botStep(g); save(); render(); }, window.PLAY_DELAY || (S.speed === 'rapida' ? 375 : 750));
 }
 function humanDraw(g, src) {
   const h = g.play.hand, my = me(g);
