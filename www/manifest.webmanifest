@@ -2,7 +2,7 @@
   "name": "Chinchón · Marcador",
   "short_name": "Chinchón",
   "description": "Marcador de puntos para el chinchón: manos, reparto, totales, eliminados y reenganches.",
-  "id": "/",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

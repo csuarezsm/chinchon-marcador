@@ -176,8 +176,8 @@ function onRenderEspera(s) {
 }
 
 async function onInvitar(codigo) {
-  const enlace = (typeof isPlay === 'function' && isPlay()) ? PLAY_URL : APK_URL;
-  const text = `🃏 ¡Juega al chinchón conmigo!\n\nAbre la app Chinchón → Jugar en línea → Unirse y pon el código:\n\n*${codigo}*\n\n¿No tienes la app? Descárgala aquí:\n${enlace}`;
+  const enlace = (typeof isPlay === 'function' && isPlay()) ? '🤖 Android: ' + PLAY_URL + '\n🍏 iPhone: ' + WEB_URL : DESCARGA_URL;
+  const text = `🃏 ¡Juega al chinchón conmigo!\n\nAbre la app Chinchón → Jugar en línea → Unirse y pon el código:\n\n*${codigo}*\n\n¿No tienes la app? Es gratis, para Android e iPhone:\n${enlace}`;
   try {
     if (isNative()) { await window.Capacitor.Plugins.Share.share({ title: 'Partida de chinchón', text, dialogTitle: 'Invitar' }); return; }
     if (navigator.share) { await navigator.share({ title: 'Partida de chinchón', text }); return; }

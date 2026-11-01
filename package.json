@@ -1,6 +1,6 @@
 {
   "name": "chinchon-marcador",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "private": true,
   "author": "IT Canarias",
   "license": "UNLICENSED",
@@ -9,6 +9,7 @@
     "sync": "npx cap sync android",
     "open": "npx cap open android",
     "test": "node tests/app.test.mjs",
+    "web": "bash tools/publicar-web.sh",
     "icons": "npx @capacitor/assets generate --android --iconBackgroundColor '#0e3b2c' --splashBackgroundColor '#0b2a20'"
   },
   "dependencies": {
