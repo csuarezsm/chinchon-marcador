@@ -351,6 +351,7 @@ console.log('Juego contra la máquina');
   await A.p.waitForSelector('.pt-table'); await B.p.waitForSelector('.pt-table');
   const manos = await Promise.all([A, B].map(x => x.p.evaluate(() => ON.sala.partida.miMano)));
   check('cada móvil ve sus 7 cartas y no las del otro', manos[0].length === 7 && manos[1].length === 7 && !manos[0].some(c => manos[1].includes(c)));
+  check('al llegar tu turno en línea suena y vibra el aviso (a alguno de los dos ya le ha tocado)', await (async () => { for (let k = 0; k < 100; k++) { const v = await A.p.evaluate(() => AvisoTurno.veces) + await B.p.evaluate(() => AvisoTurno.veces); if (v > 0) return true; await new Promise(r => setTimeout(r, 100)); } return false; })());
   // juegan los dos desde la pantalla hasta terminar una mano
   const paso = async x => {
     const st = await x.p.evaluate(() => { const s = ON.sala; if (!s || !s.partida) return 'nada'; const p = s.partida; if (p.fase === 'over') return document.querySelector('#prNext') ? 'seguir' : 'nada'; return p.turno === s.yo ? p.fase : 'nada'; });
@@ -450,6 +451,9 @@ console.log('Más juegos de IT Canarias');
   await q.goto(URL_APP); await q.waitForTimeout(300);
   const web = await q.evaluate(() => { let u = ''; window.openExternal = x => { u = x; }; MasJuegos.abrir(); document.querySelector('[data-mj="0"]').click(); return u; });
   check('en iPhone el botón abre la versión web del juego', /\/app\/$/.test(web), web);
+  // aviso de turno: se puede quitar en los ajustes
+  const aviso = await q.evaluate(() => { closeModal(); document.querySelector('#menuBtn').click(); document.querySelector('#mTheme').click(); const el = document.querySelector('#thTurno'); const antes = !!el && el.checked; el.click(); const off = S.avisoTurno === false && JSON.parse(localStorage.getItem(KEY)).avisoTurno === false; const n = AvisoTurno.veces; const sono = AvisoTurno.sonar(); return { ok: antes && off && !sono && AvisoTurno.veces === n, antes, off, sono, el: !!el }; });
+  check('el aviso de turno en línea se puede quitar en ajustes', aviso.ok, JSON.stringify(aviso));
   await ci.close();
 }
 

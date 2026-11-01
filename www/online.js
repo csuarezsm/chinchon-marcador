@@ -76,7 +76,7 @@ function onRecibirSala(sala) {
     const p = sala.partida;
     const miTurno = sala.estado === 'jugando' && p.turno === sala.yo && p.fase !== 'over';
     const clave = p.mano + '|' + p.turnos;
-    if (miTurno && ON.ultimoTurno !== clave) { ON.ultimoTurno = clave; vibrate(30); }
+    if (miTurno && ON.ultimoTurno !== clave) { ON.ultimoTurno = clave; AvisoTurno.sonar(); }   // sonido y vibración (se quita en ajustes)
     if (p.miMano && ON.sel && !p.miMano.includes(ON.sel)) ON.sel = null;
     if (p.fase !== 'discard' || p.turno !== sala.yo) ON.sel = null;
     if (sala.estado === 'fin') onArchivar(p);

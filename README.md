@@ -1,7 +1,7 @@
 # Chinchón · Marcador
 
 Marcador de puntos para el chinchón. App Android (Capacitor) y PWA a partir del mismo código (`www/`).
-Paquete: `com.itcanarias.chinchon` · versión 2.8.2
+Paquete: `com.itcanarias.chinchon` · versión 2.8.3
 
 **iPhone y navegadores**: la misma app se publica como versión web instalable en https://csuarezsm.github.io/chinchon-marcador/app/ (GitHub Pages, carpeta `docs/app`, copia de `www/`). En Safari: Compartir → «Añadir a pantalla de inicio». Tras cambiar `www/`, ejecuta `npm run web` antes del commit: las pruebas y el workflow comprueban que `docs/app` está al día. La página de descarga (https://csuarezsm.github.io/chinchon-marcador/) ofrece Android e iPhone, y el mensaje de «Compartir la app» enlaza a ella.
 
@@ -58,3 +58,7 @@ Toda la app está en `www/index.html`. Después de cambiarla:
 ## Más juegos de IT Canarias
 
 En el menú ⋮ → «🎲 Más juegos de IT Canarias» y en la página de descarga aparecen los otros juegos (Ajedrez, Damas, Chinchón, Pumba). El código es `www/masjuegos.js`, **el mismo archivo en todas las apps**, con la lista y los iconos (`www/juegos/`) dentro para que funcione sin conexión. Con internet, la app lee como mucho cada 12 horas el catálogo común `https://csuarezsm.github.io/juegos-servidor/juegos.json` (repo `juegos-servidor`, carpeta `docs/`): un juego nuevo añadido allí aparece en todas las apps sin actualizarlas. En Android, si el otro juego está instalado, el botón lo abre (plugin `OtrasApps` y `<queries>` del manifiesto); si no, lleva a su página de descarga, o a Google Play si el catálogo tiene su enlace `play` y esta es la versión de Play. En iPhone abre su versión web.
+
+## Aviso de turno en línea
+
+En una partida en línea, cuando pasa a ser tu turno suena un «ding-dong» corto y el móvil vibra (`www/turno.js`, el mismo archivo en todas las apps; sonido sintetizado). Se quita en ⋮ → Colores… → «🔔 Aviso de turno en línea». Suena con la app abierta; con la app en segundo plano el sistema puede pausarla.
