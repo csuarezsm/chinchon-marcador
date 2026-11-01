@@ -361,7 +361,8 @@ console.log('Juego contra la máquina');
     return st;
   };
   let vista = false, siguientes = 0;
-  for (let i = 0; i < 600 && siguientes < 2; i++) {
+  // por tiempo y no por vueltas: en GitHub el navegador va más lento
+  for (const t0 = Date.now(); Date.now() - t0 < 120000 && siguientes < 2;) {
     for (const x of [A, B]) { if (await x.p.$('#prNext') && (await x.p.textContent('.sec')).includes('anotada')) vista = true; const r = await paso(x); if (r === 'seguir') siguientes++; }
     await A.p.waitForTimeout(20);
   }
