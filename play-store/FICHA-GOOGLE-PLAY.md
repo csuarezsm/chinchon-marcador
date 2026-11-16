@@ -53,8 +53,8 @@ El chinchón de toda la vida con baraja española: juega contra la máquina, en 
 • Funciona en vertical, en horizontal y en tablet.
 • En español, inglés, francés, alemán e italiano.
 
-🔒 SIN ANUNCIOS Y SIN RECOGER DATOS
-No hay cuentas ni registro, no lleva anuncios ni rastreadores y tus partidas se guardan solo en tu móvil.
+🔒 SIN ANUNCIOS Y SIN CUENTAS
+No hay cuentas ni registro, no lleva anuncios ni rastreadores y tus partidas se guardan solo en tu móvil. Solo si juegas en línea se envían el apodo que pongas y tus jugadas, que se borran al terminar.
 
 Desarrollada en Lanzarote por IT Canarias.
 
